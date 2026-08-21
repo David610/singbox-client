@@ -53,7 +53,7 @@ void main() {
   });
 
   tearDownAll(() async {
-    await workDir.delete(recursive: true).catchError((_) {});
+    await workDir.delete(recursive: true).catchError((_) => workDir);
   });
 
   Future<Map<String, Object?>> writeServerConfig({
@@ -84,7 +84,7 @@ void main() {
         {'type': 'direct', 'tag': 'direct'},
       ],
     };
-    final path = '${workDir.path}/hy2_server_${port}.json';
+    final path = '${workDir.path}/hy2_server_$port.json';
     await File(path).writeAsString(jsonEncode(config));
     return {'path': path};
   }

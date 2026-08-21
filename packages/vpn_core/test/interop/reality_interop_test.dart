@@ -55,7 +55,7 @@ void main() {
   });
 
   tearDownAll(() async {
-    await workDir.delete(recursive: true).catchError((_) {});
+    await workDir.delete(recursive: true).catchError((_) => workDir);
   });
 
   test('VLESS+REALITY: generated client outbound completes a real handshake '
