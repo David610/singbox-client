@@ -22,7 +22,17 @@ Pod::Spec.new do |s|
   # developer produces Libbox.xcframework locally by running
   # packages/vpn_core/native/singbox-go/build_ios.sh (documented in
   # docs/BUILDING.md) and drops it at packages/vpn_core/ios/Frameworks/.
-  # Uncomment the next line once that framework exists locally:
+  #
+  # Deliberately NOT vendored from this podspec: `flutter_install_all_ios_pods`
+  # (ios/Podfile) links every Flutter plugin pod, this one included, into
+  # the Runner *host app* target only -- there is no separate CocoaPods
+  # integration for the PacketTunnel Network Extension target. Only the
+  # extension calls into libbox (VpnCorePlugin.swift talks to
+  # NETunnelProviderManager, a public framework, not libbox directly), so
+  # Libbox.xcframework is linked straight into the PacketTunnel target in
+  # ios/Runner.xcodeproj/project.pbxproj instead. Uncommenting
+  # `s.vendored_frameworks` here would link libbox into Runner too, which
+  # is neither needed nor wanted.
   # s.vendored_frameworks = 'Frameworks/Libbox.xcframework'
 
   s.pod_target_xcconfig = { 'DEFINES_MODULE' => 'YES' }

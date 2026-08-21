@@ -5,6 +5,7 @@ import 'dart:io';
 import 'package:build_info/build_info.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:karing/app/modules/vpn_service_state.dart';
 import 'package:karing/app/modules/auto_update_manager.dart';
 import 'package:karing/app/modules/biz.dart';
 import 'package:karing/app/modules/remote_config_manager.dart';

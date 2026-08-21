@@ -6,10 +6,12 @@ import 'dart:math';
 
 import 'package:country/country.dart' as country;
 import 'package:flutter/widgets.dart';
+import 'package:karing/app/utils/file_saver.dart';
 import 'package:karing/app/local_services/vpn_service.dart';
 import 'package:karing/app/runtime/type_checker.dart';
 import 'package:karing/app/utils/app_utils.dart';
 import 'package:karing/app/utils/cloudflare_warp_api.dart';
+import 'package:karing/app/utils/cloudflare_warp_utils.dart';
 import 'package:karing/app/utils/convert_utils.dart';
 import 'package:karing/app/utils/file_utils.dart';
 import 'package:karing/app/utils/log.dart';
@@ -21,7 +23,7 @@ import 'package:karing/app/utils/singbox_config_builder.dart';
 import 'package:karing/app/utils/singbox_outbound.dart';
 import 'package:karing/i18n/strings.g.dart';
 import 'package:karing/screens/widgets/text_field.dart';
-import 'package:vpn_service/proxy_manager.dart';
+import 'package:karing/app/modules/vpn_service_state.dart';
 
 Map<String, dynamic> removeNotMap(Map<String, dynamic> object) {
   object.removeWhere((key, value) {

@@ -18,7 +18,7 @@ import 'package:karing/screens/group_helper.dart';
 import 'package:karing/screens/theme_config.dart';
 import 'package:karing/screens/widgets/framework.dart';
 import 'package:path/path.dart' as path;
-import 'package:vpn_service/vpn_service.dart';
+import 'package:karing/app/local_services/vpn_service.dart';
 import 'package:tuple/tuple.dart';
 import 'package:mime/mime.dart';
 import 'package:http_parser/http_parser.dart';

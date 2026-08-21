@@ -57,10 +57,14 @@ CI (see "CI/CD" below).
 
 ## Building the Android VPN core
 
-The Dart/Kotlin/Manifest side of `vpn_core` compiles without the real
-sing-box core (see `docs/ARCHITECTURE.md` §10, "Why libbox.aar isn't
-committed" and `LibboxBridge.kt`'s reflection boundary). To get an actually
-functional tunnel:
+As of this milestone, `packages/vpn_core/android`'s Gradle build
+**requires** `libbox.aar` to exist (see `docs/ARCHITECTURE.md` §6/§10) --
+`SingBoxVpnService.kt` links against `io.nekohasekai.libbox.*` directly,
+not via reflection, so there is no "compiles without the real core"
+fallback anymore. `flutter pub get`/`flutter analyze`/`flutter test` at
+the Dart level are unaffected (they never invoke this module's Gradle
+build); only an actual Android build/release needs the AAR to exist
+first. To produce it:
 
 ```sh
 cd packages/vpn_core/native/singbox-go
@@ -95,23 +99,30 @@ cd packages/vpn_core/native/singbox-go
 # -> writes packages/vpn_core/ios/Frameworks/Libbox.xcframework
 ```
 
-Then, in Xcode:
+Then:
 
-1. Uncomment `s.vendored_frameworks` in `packages/vpn_core/ios/vpn_core.podspec`.
-2. Add a Network Extension target named to match
-   `VpnCorePlugin.swift`'s `tunnelBundleIdentifierSuffix` (`.PacketTunnel`
-   by default — either rename the target's bundle id to match, or edit the
-   suffix in `packages/vpn_core/ios/Classes/VpnCorePlugin.swift`), with
-   `ios/vpnCoreService/PacketTunnelProvider.swift` as its source and
-   `Libbox.xcframework` linked to it (not to the main `Runner` target).
-3. `cd ios && pod install`
-4. `flutter build ios --debug --no-codesign` (or open `Runner.xcworkspace`
-   and build/run from Xcode for a signed build on a device).
+1. `cd ios && pod install` (`Libbox.xcframework` is deliberately **not**
+   vendored via `vpn_core.podspec` — see that file's comments. It is
+   already wired directly into the `PacketTunnel` Network Extension
+   target's Frameworks build phase in `Runner.xcodeproj/project.pbxproj`,
+   which now expects `Libbox.xcframework` to exist at the path
+   `build_ios.sh` writes to before that target will build.)
+2. `flutter build ios --debug --no-codesign` (or open `Runner.xcworkspace`
+   in Xcode and build/run from there for a signed build on a device).
 
-This mirrors how Karing's own `ios/karingService` Network Extension target
-was structured (see `docs/FORK_ARCHITECTURE_AUDIT.md` §5), except
-`PacketTunnelProvider.swift` now contains real tunnel logic instead of an
-empty subclass of a missing framework.
+The `PacketTunnel` Network Extension target (bundle id
+`com.nebula.karing.PacketTunnel`, matching `VpnCorePlugin.swift`'s
+`tunnelBundleIdentifierSuffix`) is already registered in
+`ios/Runner.xcodeproj/project.pbxproj`, with `ios/vpnCoreService/*.swift`
+as its sources and `Libbox.xcframework` linked to it only (not to the main
+`Runner` target). It replaces Karing's own `ios/karingService` target
+(see `docs/FORK_ARCHITECTURE_AUDIT.md` §5), which has been removed rather
+than repaired — it depended on a `LibVpnCore.framework` built from a
+`../bind/apple/` path that does not exist anywhere in this repository.
+**This target registration was hand-edited into `project.pbxproj` directly
+(text editing, not through Xcode's UI) and has never been opened in Xcode
+or built** — see "What could not be verified in this environment" below
+for exactly what that means and what to check first.
 
 ## What could not be verified in this environment
 
@@ -124,19 +135,67 @@ Stated plainly, per this task's own instructions ("never fake a build"):
   was written and manually re-read for syntax/type correctness, but not
   compiler-checked.
 - **No Android SDK/NDK/emulator.** `build_android.sh`, the Gradle files,
-  and `SingBoxVpnService.kt`/`VpnCorePlugin.kt`/`LibboxBridge.kt` were not
-  compiled or run. `VpnService`/`Builder`/`ParcelFileDescriptor` API usage
-  was written against documented Android APIs, not verified by a compiler.
-- **No macOS/Xcode.** `build_ios.sh`,
-  `packages/vpn_core/ios/Classes/VpnCorePlugin.swift`, and
-  `ios/vpnCoreService/PacketTunnelProvider.swift` were not compiled. In
-  particular, `LibboxPlatformInterface`'s exact method names are gomobile's
-  *generated* Swift binding of a Go interface that **was** read directly
-  from the pinned sing-box source (real, verified) — but gomobile's exact
-  naming convention for that generated code was not independently
-  confirmed against a built `Libbox.xcframework` header, because none was
-  built. Treat that file as "structurally correct, naming unverified" until
-  a real `build_ios.sh` run + Xcode build confirms it.
+  and `SingBoxVpnService.kt`/`VpnPlatformInterface.kt`/
+  `VpnCommandServerHandler.kt`/`VpnCorePlugin.kt` were not compiled or
+  run against the real generated `io.nekohasekai.libbox.*` Java bindings
+  (that requires `gomobile bind` with the Android NDK, neither available
+  here). `VpnService`/`Builder`/`ParcelFileDescriptor`/`ConnectivityManager`
+  API usage was written against documented Android APIs, not verified by
+  a compiler. What WAS done to reduce that risk: every
+  `io.nekohasekai.libbox.*` method name/signature used was read directly
+  from the pinned v1.13.19 Go source (not guessed), and the Kotlin
+  structure (which class implements `PlatformInterface` directly vs. a
+  separate wrapper, which methods get real default implementations vs.
+  which three only `VpnService` itself can implement) was cross-checked
+  against SagerNet/sing-box-for-android's own real, building Android
+  client at the matching architecture generation (`main`/1.14.0-rc.1,
+  fetched via `git clone` in this session) rather than derived from the
+  Go interface alone. The one part of that reference NOT followed
+  verbatim: this module puts `PlatformInterface`'s TUN-independent
+  default methods in a separate `VpnPlatformInterfaceWrapper` interface
+  (mirroring upstream's own split) but keeps `openTun`/
+  `autoDetectInterfaceControl`/`sendNotification` directly on
+  `SingBoxVpnService` rather than a standalone helper class holding a
+  `VpnService` reference -- constructing `android.net.VpnService.Builder`
+  (a non-static Java inner class) from outside its own outer instance is
+  an edge case with no reference implementation to check it against, so
+  this module avoids it entirely by mixing the interface directly into
+  the service class, exactly as upstream does.
+  The state-machine logic that does NOT depend on Android/libbox
+  (`VpnLifecycleState.kt`) IS compiler- and test-verified: see "What WAS
+  actually verified" below.
+- **No macOS/Xcode/iPhone.** `build_ios.sh` was not run, `Libbox.xcframework`
+  was not built, none of `packages/vpn_core/ios/Classes/VpnCorePlugin.swift`
+  or `ios/vpnCoreService/{PacketTunnelProvider,PlatformInterface,RunBlocking}.swift`
+  were compiled, `ios/Runner.xcodeproj` was never opened in Xcode (the
+  `PacketTunnel` Network Extension target registered in `project.pbxproj`
+  was added by hand-editing that file's text directly, not through Xcode's
+  "New Target" UI — a materially higher-risk way to register a target,
+  since nothing here re-derived or validated the project graph the way
+  Xcode's own target wizard would), and `xcodebuild`/a signed device
+  install/any on-device test (VLESS TCP, Hysteria2 UDP, DNS, IPv4/IPv6,
+  sleep/wake, Wi-Fi/cellular transition, repeated connect/disconnect) was
+  not run. What WAS done to reduce that risk, in place of an actual build:
+  every Go-side interface (`PlatformInterface`, `CommandServerHandler`,
+  `TunOptions`, `SetupOptions`, `OverrideOptions`) that
+  `PlatformInterface.swift` implements or calls was read directly from the
+  pinned `github.com/sagernet/sing-box@v1.13.19` module source (real, not
+  guessed), and the exact Swift method signatures, libbox call sequence,
+  and TUN-fd retrieval mechanism (`packetFlow.value(forKeyPath:
+  "socket.fileDescriptor")` falling back to `LibboxGetTunnelFileDescriptor()`)
+  were cross-checked against `SagerNet/sing-box-for-apple`'s own real,
+  production Swift source at its `main` branch — the one branch of that
+  repo whose `MARKETING_VERSION` (`1.13.19`) exactly matches this
+  project's pin (its `stable` branch, pinned to `1.13.0-alpha.21`, was
+  fetched too and rejected: it calls a `LibboxNewService`/`LibboxBoxService`
+  constructor pair that does not exist in the pinned v1.13.19 Go source,
+  confirmed by grepping that module for `^func New` and finding only
+  `NewCommandServer`). See `docs/ARCHITECTURE.md` §7 for the full
+  verification account and exactly what was trimmed relative to that
+  reference and why. Treat all of it as "cross-checked against real,
+  matching-version source on both sides of the binding, never compiled or
+  run" until an actual `build_ios.sh` run, Xcode build, and device test
+  confirm it.
 - **What WAS actually verified, with commands run and shown in this
   session:**
   - `github.com/sagernet/sing-box@v1.13.19` resolves via the public Go
@@ -161,7 +220,26 @@ Stated plainly, per this task's own instructions ("never fake a build"):
   - The exact Android `-javapkg=io.nekohasekai` flag sing-box's own
     `cmd/internal/build_libbox/main.go` passes to gomobile was read
     directly from that file, confirming `io.nekohasekai.libbox.*` as the
-    real generated Java package (used in `LibboxBridge.kt`).
+    real generated Java package.
+  - `SagerNet/sing-box-for-android` (upstream's own real, building Android
+    client for this exact core) was fetched via `git clone` at both its
+    `stable` (1.12.23) and `main` (1.14.0-rc.1) branches and read
+    directly, not from memory -- this is what let the discrepancy between
+    those two branches' `PlatformInterface`/`CommandServerHandler` shapes
+    (e.g. `findConnectionOwner`'s return type, `BoxService` vs.
+    `CommandServer.startOrReloadService`) be caught and resolved in favor
+    of matching the pinned v1.13.19 Go source directly, rather than
+    copying whichever branch was fetched first.
+  - `VpnLifecycleState.kt` (the Android VPN service's start/stop/reload
+    state machine -- no Android or libbox dependency) was **actually
+    compiled and its unit tests actually run** in this session: the
+    Kotlin 2.2.20 compiler and a JUnit 4 runtime were installed
+    standalone (no Android SDK/Gradle involved), `VpnLifecycleState.kt` +
+    `VpnLifecycleStateTest.kt` were compiled together, and all 11 tests
+    in `VpnLifecycleStateTest.kt` passed. This is a real, executed result
+    for the state-machine logic specifically -- not extended to any
+    Android- or libbox-dependent file, which still requires the real SDK/
+    NDK/toolchain neither available here.
 
 ## Known remaining build blockers
 
@@ -182,13 +260,25 @@ succeeding on a clean clone today, neither of which this milestone's scope
 
 The single most valuable next step, in order:
 
-1. **Packet-loop wiring** (`docs/ARCHITECTURE.md` §9 item 1): connect
-   `SingBoxVpnService`'s established `ParcelFileDescriptor` (Android) and
-   `LibboxPlatformInterface.openTun`'s settings (iOS) through to a real
-   `libbox.NewCommandServer`/`BoxService` instance, so a config actually
-   starts moving packets. This is scoped, testable in isolation (once
-   `libbox.aar`/`Libbox.xcframework` are built per this document), and
-   does not require touching `lib/`.
+1. **Packet-loop wiring — DONE for both Android and iOS, unverified on
+   real hardware for either** (`docs/ARCHITECTURE.md` §9 item 1).
+   Android: `SingBoxVpnService` implements `PlatformInterface` directly
+   and drives a real `CommandServer.startOrReloadService` lifecycle (see
+   `docs/ARCHITECTURE.md` §6) — the concrete remaining step is building
+   `libbox.aar` (this document, above) and running
+   `SingBoxVpnServiceInstrumentedTest` plus a manual device acceptance
+   pass against a real `singbox-vpn` server, neither possible in this
+   environment (no NDK, no device). iOS: `ExtensionPlatformInterface.openTun`
+   applies the tunnel network settings and hands libbox the real TUN fd,
+   which libbox then owns for its own packet read/write loop (see
+   `docs/ARCHITECTURE.md` §7) — the concrete remaining step is building
+   `Libbox.xcframework` (this document, above), opening
+   `Runner.xcworkspace` in Xcode to confirm the hand-edited
+   `PacketTunnel` target actually builds, and the full physical-device
+   test list this milestone specified (VLESS TCP, Hysteria2 UDP, DNS,
+   IPv4/IPv6, sleep/wake, Wi-Fi/cellular transition, 10 connect/disconnect
+   cycles), none possible in this environment (no macOS, no Xcode, no
+   iPhone).
 2. Only after that: begin reconstructing `lib/app/utils/` and
    `VPNService`/`ProxyConfig`/`ServerConfig`, file by file, starting with
    whichever the fewest other files depend on — that work should get its

@@ -5,6 +5,7 @@ import 'dart:io';
 import 'dart:ui';
 
 import 'package:karing/app/local_services/vpn_service.dart';
+import 'package:karing/app/modules/vpn_service_state.dart';
 import 'package:karing/app/modules/board_provider_manager.dart';
 import 'package:karing/app/utils/device_utils.dart';
 import 'package:karing/app/utils/http_overrides_utils.dart';
@@ -43,7 +44,6 @@ import 'package:path/path.dart' as path;
 import 'package:provider/provider.dart';
 import 'package:screen_retriever/screen_retriever.dart';
 import 'package:tray_manager/tray_manager.dart';
-import 'package:vpn_service/vpn_service.dart';
 import 'package:window_manager/window_manager.dart';
 import 'package:flutter_single_instance/flutter_single_instance.dart';
 

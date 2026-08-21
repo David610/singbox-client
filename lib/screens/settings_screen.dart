@@ -58,7 +58,6 @@ import 'package:path/path.dart' as path;
 import 'package:provider/provider.dart';
 import 'package:tuple/tuple.dart';
 import 'package:url_launcher/url_launcher.dart';
-import 'package:vpn_service/vpn_service.dart';
 
 class SettingsScreen extends LasyRenderingStatefulWidget {
   static RouteSettings routSettings() {

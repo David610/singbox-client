@@ -31,8 +31,7 @@ import 'package:karing/screens/widgets/text.dart';
 import 'package:path/path.dart' as path;
 import 'package:provider/provider.dart';
 import 'package:tuple/tuple.dart';
-import 'package:vpn_service/state.dart';
-import 'package:vpn_service/vpn_service.dart';
+import 'package:karing/app/modules/vpn_service_state.dart';
 
 abstract class SwitchCard extends StatefulWidget {
   const SwitchCard({

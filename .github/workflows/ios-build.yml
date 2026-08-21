@@ -13,24 +13,27 @@ name: iOS build
 #      step, for the same pre-existing reasons as pr-fast.yml's app
 #      analyze/test (docs/ARCHITECTURE.md §9).
 #   2. EVEN IF (1) is fixed, `xcodebuild` compiling the full `Runner`
-#      scheme is expected to fail on the embedded extension target,
-#      because:
-#      - The Xcode project's only currently-REGISTERED extension target
-#        is still the old "karingService", pointing at
-#        ios/karingService/PacketTunnelProvider.swift, which imports the
-#        still-missing `LibVpnCore` framework (see
-#        docs/FORK_ARCHITECTURE_AUDIT.md §5).
-#      - This project's NEW replacement,
-#        ios/vpnCoreService/PacketTunnelProvider.swift (see
-#        docs/ARCHITECTURE.md §7 and docs/BUILDING.md "iOS"), is not yet
-#        wired into the .xcodeproj as its own target -- that requires
-#        interactive Xcode project surgery documented as a prerequisite
-#        in docs/BUILDING.md, out of scope for this CI-only task.
+#      scheme is STILL expected to fail on the embedded extension target,
+#      but for a different reason now: the Xcode project DOES register a
+#      real "PacketTunnel" extension target (ios/vpnCoreService/*.swift,
+#      see docs/ARCHITECTURE.md §7 and docs/BUILDING.md "iOS"), but that
+#      target links Libbox.xcframework, which this job never builds --
+#      there is no step here running
+#      packages/vpn_core/native/singbox-go/build_ios.sh first. Until such
+#      a step is added (it needs Go + Xcode's toolchain + gomobile and is
+#      a meaningfully slower job than the rest of this workflow, so it
+#      was not added speculatively), the link step for PacketTunnel will
+#      fail with a missing-framework error, not a missing-target error.
+#      The target registration itself was also hand-edited into
+#      project.pbxproj directly (no Xcode available to add it through the
+#      UI or validate the result) -- this job is the first real test of
+#      whether that hand-edit is even structurally valid Xcode project
+#      data, independent of whether Libbox.xcframework exists.
 #
 # This job is intentionally NOT continue-on-error: per this task's own
 # instruction ("fail if the VPN extension does not compile"), a build
-# step is binary pass/fail by nature. It stays red, honestly, until the
-# Xcode target work lands -- see docs/CI.md "iOS extension target gap".
+# step is binary pass/fail by nature. It stays red, honestly, until both
+# of the above are addressed -- see docs/CI.md "iOS extension target gap".
 #
 # Do not read a green run of this workflow (once it exists) as proof the
 # app works on a real iPhone -- a simulator/unsigned build proves the
@@ -123,5 +126,7 @@ jobs:
             echo "### iOS build"
             echo ""
             echo "See this workflow file's header comment for exactly why"
-            echo "this is expected to be red today and what unblocks it."
+            echo "this is expected to be red today (missing Libbox.xcframework"
+            echo "build step, and an unverified hand-edited pbxproj target)"
+            echo "and what unblocks it."
           } >> "$GITHUB_STEP_SUMMARY"

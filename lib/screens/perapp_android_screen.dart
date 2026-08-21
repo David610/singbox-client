@@ -124,7 +124,7 @@ class _PerAppAndroidScreenState
     for (var papp in perapp.list) {
       if (!exists.contains(papp) && !existsSystem.contains(papp)) {
         PackageInfoEx info = PackageInfoEx();
-        info.info = PackageInfoImpl(papp);
+        info.info = PackageInfoImpl(packageName: papp);
         info.name = PackageManagerAndroid.kRemoved;
         info.icon = null;
 
@@ -150,10 +150,11 @@ class _PerAppAndroidScreenState
     if (SettingManager.getConfig().perapp.hideAppIcon) {
       return null;
     }
-    return PackageManagerAndroid.getInstalledPackageIcon(
+    final bytes = await PackageManagerAndroid.getInstalledPackageIcon(
       _applicationInfoList,
       packageName,
     );
+    return bytes == null ? null : Image.memory(bytes);
   }
 
   @override

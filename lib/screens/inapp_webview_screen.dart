@@ -15,7 +15,7 @@ import 'package:karing/i18n/strings.g.dart';
 import 'package:karing/screens/theme_config.dart';
 import 'package:karing/screens/theme_define.dart';
 import 'package:url_launcher/url_launcher.dart';
-import 'package:vpn_service/vpn_service.dart';
+import 'package:karing/app/local_services/vpn_service.dart';
 
 class InAppWebViewScreen extends StatefulWidget {
   static RouteSettings routSettings(String viewTag) {

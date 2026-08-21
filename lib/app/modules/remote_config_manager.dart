@@ -13,11 +13,12 @@ import 'package:karing/app/utils/app_utils.dart';
 import 'package:karing/app/utils/auto_update_utils.dart';
 import 'package:karing/app/utils/did.dart';
 import 'package:karing/app/utils/file_utils.dart';
+import 'package:karing/app/utils/file_saver.dart';
 import 'package:karing/app/utils/log.dart';
 import 'package:karing/app/utils/path_utils.dart';
 import 'package:karing/app/utils/platform_utils.dart';
 import 'package:karing/app/utils/version_compare_utils.dart';
-import 'package:vpn_service/state.dart';
+import 'package:karing/app/modules/vpn_service_state.dart';
 
 class RemoteConfigManager {
   static final List<void Function()> onEventCheck = [];

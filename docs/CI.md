@@ -390,34 +390,32 @@ finished app. These are not CI bugs:
    regression this task asked CI to catch going forward, once the
    baseline is fixed.
 
-3. **The iOS VPN extension target gap**: this task asked for a job that
-   compiles "the main application AND PacketTunnel/NetworkExtension
-   target" and "fails if the VPN extension does not compile." As
-   implemented, `ios-build.yml` runs `xcodebuild` against the full
-   `Runner` scheme, which — once (2) is fixed — WOULD force whatever
-   extension target is currently embedded to compile. But today:
-   - The Xcode project's only *registered* extension target is still the
-     old `karingService`, pointing at
-     `ios/karingService/PacketTunnelProvider.swift`, which imports the
-     still-missing `LibVpnCore` framework
-     (`docs/FORK_ARCHITECTURE_AUDIT.md` §5).
-   - This project's replacement,
-     `ios/vpnCoreService/PacketTunnelProvider.swift`
-     (`docs/ARCHITECTURE.md` §7), exists as source but is **not yet wired
-     into the `.xcodeproj` as its own target** — `docs/BUILDING.md` "iOS"
-     already documents this as a manual Xcode step a developer must do.
-     Registering a new `PBXNativeTarget` by hand-editing `project.pbxproj`
-     without Xcode available to validate the result was judged too risky
-     for this CI-only task (a malformed pbxproj can break the whole iOS
-     project, not just CI) — so it wasn't attempted here.
+3. **The iOS VPN extension target gap — since closed, still unverified by
+   an actual build.** This task originally asked for a job that compiles
+   "the main application AND PacketTunnel/NetworkExtension target" and
+   "fails if the VPN extension does not compile," and at the time this
+   section was first written, the Xcode project's only *registered*
+   extension target was still the old `karingService`, pointing at
+   `ios/karingService/PacketTunnelProvider.swift`, which imported the
+   still-missing `LibVpnCore` framework — registering a real target by
+   hand-editing `project.pbxproj` without Xcode available to validate the
+   result was judged too risky to attempt in a CI-only task.
 
-   Net effect: `ios-build.yml`'s `xcodebuild` step will fail on the
-   embedded extension regardless of (2), until a developer with Xcode
-   completes that target registration per `docs/BUILDING.md`. This
-   workflow is ready to enforce the requirement the moment that happens;
-   it cannot enforce it before then, and says so in its own header
-   comment rather than building something that only looks like it checks
-   the extension.
+   In a later pass (`docs/ARCHITECTURE.md` §7), that registration WAS
+   attempted: `ios/Runner.xcodeproj/project.pbxproj` now registers a
+   `PacketTunnel` extension target with `ios/vpnCoreService/*.swift` as
+   its sources, `Libbox.xcframework` linked into it, and the old
+   `karingService`/`LibVpnCore` dead configuration removed. That edit was
+   still made by hand-editing the file's text directly, with no macOS/
+   Xcode available anywhere in that process to open the project and
+   confirm it parses or builds — so `ios-build.yml`'s `xcodebuild` step
+   against the full `Runner` scheme is the actual, real test of whether
+   that hand-edit is valid, and it has never been run against this
+   version of the file. Net effect: this workflow is ready to enforce the
+   "extension must compile" requirement and, unlike before, now has a real
+   target to compile — but whether it currently passes or fails is
+   genuinely unknown until CI (or a developer with Xcode) actually runs
+   it.
 
 4. **A real, previously-undiscovered Gradle-configuration blocker was
    found and fixed while building `android-build.yml`**:

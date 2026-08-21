@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:karing/app/modules/biz.dart';
 import 'package:karing/app/modules/setting_manager.dart';
+import 'package:karing/app/modules/vpn_service_state.dart';
 import 'package:karing/app/runtime/return_result.dart';
 import 'package:karing/app/utils/clash_api.dart';
 import 'package:karing/app/utils/network_utils.dart';

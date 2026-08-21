@@ -25,6 +25,7 @@ android {
 
     defaultConfig {
         minSdk = 26
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
     compileOptions {
@@ -39,12 +40,19 @@ android {
     // repository (it is Go, built by the upstream sing-box build system).
     // A developer produces libbox.aar locally by running
     // packages/vpn_core/native/singbox-go/build_android.sh (documented in
-    // docs/BUILDING.md) and drops it here. Until that file exists, this
-    // module still compiles -- SingBoxVpnService.kt fails fast at runtime
-    // with a clear error instead of failing the build, so `flutter pub get`
-    // / `flutter analyze` / `flutter test` keep working without the core.
+    // docs/BUILDING.md) and drops it here.
     //
-    // See docs/ARCHITECTURE.md "Why libbox.aar isn't committed".
+    // Policy change from the prior milestone (see docs/ARCHITECTURE.md
+    // "Why libbox.aar isn't committed" and its "Android VPN path"
+    // section): libbox.aar is now a MANDATORY build input, checked below.
+    // SingBoxVpnService.kt talks to `io.nekohasekai.libbox.*` via direct
+    // imports, not reflection -- there is no code path left that could
+    // silently "succeed" at connecting without a real core, so a missing
+    // AAR must fail the Android build itself, loudly, rather than compile
+    // a service that publishes CONNECTED without ever forwarding a
+    // packet. `flutter pub get`/`flutter analyze`/`flutter test` at the
+    // Dart level are unaffected -- they never invoke Gradle for this
+    // module -- so this only gates an actual Android build/release.
 }
 
 repositories {
@@ -54,7 +62,19 @@ repositories {
 
 dependencies {
     def libboxAar = file("libs/libbox.aar")
-    if (libboxAar.exists()) {
-        implementation(files(libboxAar))
+    if (!libboxAar.exists()) {
+        throw new GradleException(
+            "packages/vpn_core/android/libs/libbox.aar is missing. " +
+            "The Android VPN path links against the pinned sing-box core " +
+            "directly (io.nekohasekai.libbox.*), not via reflection, so " +
+            "this is a hard build failure by design -- see " +
+            "docs/BUILDING.md 'Android VPN core' for how to produce it " +
+            "(packages/vpn_core/native/singbox-go/build_android.sh)."
+        )
     }
+    implementation(files(libboxAar))
+
+    testImplementation("junit:junit:4.13.2")
+    androidTestImplementation("androidx.test.ext:junit:1.2.1")
+    androidTestImplementation("androidx.test:runner:1.6.2")
 }
