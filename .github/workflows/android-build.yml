@@ -1,19 +1,19 @@
 name: Android build
 
-# Builds a debug APK (always signable, no secrets needed) and a
+# Builds the pinned sing-box/libbox core from source, verifies it, then
+# builds a debug APK (always signable, no secrets needed) and a
 # release-configuration APK signed with a throwaway, freshly-generated,
 # non-secret CI keystore (proves the shrunk/optimized release build graph
 # actually compiles -- see docs/CI.md "Why a throwaway keystore, not
 # --no-shrink"). No store/distribution signing secrets are used or
 # required -- see docs/CI.md "Secrets required: NONE".
 #
-# KNOWN CURRENT STATE: expected to fail today at the Dart-compile step
-# inside `flutter build apk`, for the same pre-existing reasons as
-# pr-fast.yml's app analyze/test (docs/ARCHITECTURE.md §9). This job is
-# NOT marked continue-on-error, unlike the fast gate's app analyze/test:
-# a build is a binary pass/fail by nature (there's no "informational
-# build failure"), so it stays a real, currently-red required check. See
-# docs/CI.md for the plan to turn it green.
+# The native-core build (steps up to and including "Verify libbox.aar
+# contents") is the load-bearing part of this job: without it,
+# android/build.gradle's hard `libbox.aar is missing` GradleException
+# (packages/vpn_core/android/build.gradle) fails the build before Kotlin
+# ever compiles against the real io.nekohasekai.libbox.* API, which is
+# the actual thing this job exists to prove compiles.
 
 on:
   pull_request:
@@ -32,7 +32,11 @@ permissions:
 
 env:
   FLUTTER_VERSION: "3.44.9" # see docs/CI.md "Pinned versions"
-  JAVA_VERSION: "17" # android/app/build.gradle.kts sourceCompatibility
+  JAVA_VERSION: "17" # android/app/build.gradle.kts sourceCompatibility, and required by sing-box's own cmd/internal/build_libbox
+  GO_VERSION: "1.24.7" # must match packages/vpn_core/native/singbox-go/go.mod's `go` directive
+  NDK_VERSION: "28.2.13676358" # android/app/build.gradle.kts ndkVersion
+  SING_BOX_PIN_TAG: "v1.13.19" # packages/vpn_core/UPSTREAM_VERSION.md
+  SING_BOX_PIN_COMMIT: "b5ebaa1fc0f2b94256180b95468e73ef53caa27d"
 
 jobs:
   android-build:
@@ -51,10 +55,75 @@ jobs:
       - name: Set up Android SDK
         uses: android-actions/setup-android@40fd30fb8d7440372e1316f5d1809ec01dcd3699 # v4.0.1
         # Installs cmdline-tools and accepts all standard SDK licenses.
-        # compileSdk 35 / buildTools 36.0.0 / NDK 28.2.13676358 (pinned in
+        # compileSdk 35 / buildTools 36.0.0 (pinned in
         # android/app/build.gradle.kts, unchanged by this workflow) are
         # fetched by the Android Gradle Plugin's own auto-download during
-        # the build below, now that licenses are pre-accepted.
+        # the build below, now that licenses are pre-accepted. NDK is
+        # installed explicitly below -- build_android.sh needs it
+        # *before* Gradle ever runs, not lazily during the build.
+
+      - name: Install Android NDK ${{ env.NDK_VERSION }}
+        run: sdkmanager --install "ndk;${{ env.NDK_VERSION }}"
+
+      - name: Set up Go ${{ env.GO_VERSION }}
+        uses: actions/setup-go@44694675825211faa026b3c33043df3e48a5fa00 # v6.0.0
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: false # cache keyed manually below against the pinned commit
+
+      - name: Verify the sing-box pin is consistent everywhere it's recorded
+        run: packages/vpn_core/native/singbox-go/check_pin_consistency.sh
+
+      - name: Cache Go build/module cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/go/pkg/mod
+            ~/.cache/go-build
+          key: go-singbox-android-${{ env.SING_BOX_PIN_COMMIT }}
+          restore-keys: go-singbox-android-
+
+      - name: Install gomobile/gobind (sagernet fork, pinned by sing-box's own Makefile)
+        # `make lib_android`'s `lib_install` target -- see
+        # packages/vpn_core/native/singbox-go/README.md "Producing the
+        # real mobile binaries". This is SagerNet's own fork
+        # (github.com/sagernet/gomobile), NOT golang.org/x/mobile -- only
+        # the fork's `build_libbox`-driven bind matches what upstream's
+        # `make lib_android` actually invokes.
+        run: |
+          go install -v github.com/sagernet/gomobile/cmd/gomobile@v0.1.12
+          go install -v github.com/sagernet/gomobile/cmd/gobind@v0.1.12
+          echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
+
+      - name: Build libbox.aar from the pinned sing-box source
+        env:
+          ANDROID_NDK_HOME: ${{ env.ANDROID_HOME }}/ndk/${{ env.NDK_VERSION }}
+          ANDROID_NDK_ROOT: ${{ env.ANDROID_HOME }}/ndk/${{ env.NDK_VERSION }}
+        run: packages/vpn_core/native/singbox-go/build_android.sh
+
+      - name: Verify libbox.aar was produced at the pinned commit
+        run: |
+          set -euo pipefail
+          test -f packages/vpn_core/android/libs/libbox.aar
+          echo "Built libbox.aar from sing-box ${{ env.SING_BOX_PIN_TAG }} / ${{ env.SING_BOX_PIN_COMMIT }}"
+          ACTUAL_COMMIT="$(git -C packages/vpn_core/native/singbox-go/.sing-box-checkout rev-parse HEAD)"
+          if [ "$ACTUAL_COMMIT" != "${{ env.SING_BOX_PIN_COMMIT }}" ]; then
+            echo "::error::checked-out sing-box commit ($ACTUAL_COMMIT) does not match the pin (${{ env.SING_BOX_PIN_COMMIT }})"
+            exit 1
+          fi
+
+      - name: Verify libbox.aar contents (sanity check)
+        run: |
+          set -euo pipefail
+          echo "### libbox.aar contents (jni/*)"
+          unzip -l packages/vpn_core/android/libs/libbox.aar | grep '\.so$'
+          for abi in armeabi-v7a arm64-v8a x86 x86_64; do
+            unzip -l packages/vpn_core/android/libs/libbox.aar | grep -q "jni/$abi/libbox.so" \
+              || { echo "::error::libbox.aar is missing jni/$abi/libbox.so"; exit 1; }
+          done
+          unzip -p packages/vpn_core/android/libs/libbox.aar classes.jar > /tmp/libbox-classes.jar
+          unzip -l /tmp/libbox-classes.jar | grep -q 'io/nekohasekai/libbox/PlatformInterface.class' \
+            || { echo "::error::libbox.aar's classes.jar is missing io.nekohasekai.libbox.PlatformInterface"; exit 1; }
 
       - name: Set up Flutter ${{ env.FLUTTER_VERSION }}
         uses: subosito/flutter-action@1508160852fb97248640997f7cfb38da241df0ba # v2.9.1
@@ -85,7 +154,7 @@ jobs:
       - name: flutter pub get
         run: flutter pub get
 
-      - name: Build debug APK
+      - name: Build debug APK (Kotlin compiles against the real io.nekohasekai.libbox API)
         run: flutter build apk --debug
 
       - name: Generate throwaway CI-only release keystore (NOT a secret)

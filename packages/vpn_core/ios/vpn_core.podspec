@@ -10,7 +10,7 @@ Pod::Spec.new do |s|
   NEPacketTunnelProvider on iOS. See docs/ARCHITECTURE.md.
   DESC
   s.homepage         = 'https://github.com/David610/singbox-client'
-  s.license          = { :file => '../LICENSE.md' }
+  s.license          = { :file => '../../../LICENSE.md' }
   s.author           = { 'singbox-client' => 'noreply@example.invalid' }
   s.source           = { :path => '.' }
   s.source_files     = 'Classes/**/*'

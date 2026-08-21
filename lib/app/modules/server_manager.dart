@@ -33,7 +33,6 @@ import 'package:karing/app/utils/platform_utils.dart';
 import 'package:karing/app/utils/proxy_conf_utils.dart';
 import 'package:karing/app/utils/ruleset_codes_utils.dart';
 import 'package:karing/app/utils/sentry_utils.dart';
-import 'package:karing/app/utils/singbox_config_builder.dart';
 import 'package:karing/app/utils/singbox_dns.dart';
 import 'package:karing/app/utils/tag_gen.dart';
 import 'package:karing/app/utils/zip_utils.dart';
@@ -1226,7 +1225,7 @@ class ServerManager {
     allUrls.addAll(dnsUrl);
     String tag = "dns_latency_test_tag";
     String tagResolver = "dns_latency_test_resolver_tag";
-    final servers = SingboxDNSTryParseList(
+    final servers = singboxDNSTryParseList(
       allUrls.toList(),
       null,
       SingboxDNSDomainResolver(
@@ -1241,7 +1240,7 @@ class ServerManager {
     DNSQueryRequest req = DNSQueryRequest();
     req.servers = servers.data!;
     if (detour != kOutboundTagDirect) {
-      final serversDetour = SingboxDNSTryParseList(
+      final serversDetour = singboxDNSTryParseList(
         dnsUrl,
         detour,
         SingboxDNSDomainResolver(

@@ -4,7 +4,6 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:karing/app/local_services/vpn_service.dart';
 import 'package:karing/app/modules/biz.dart';
 import 'package:karing/app/modules/server_manager.dart';
 import 'package:karing/app/modules/setting_manager.dart';
@@ -12,8 +11,6 @@ import 'package:karing/app/runtime/return_result.dart';
 import 'package:karing/app/utils/clash_api.dart';
 import 'package:karing/app/utils/http_utils.dart';
 import 'package:karing/app/utils/network_utils.dart';
-import 'package:karing/app/utils/proxy_conf_utils.dart';
-import 'package:karing/app/utils/singbox_config_builder.dart';
 import 'package:karing/app/utils/system_utils.dart';
 import 'package:karing/app/utils/websocket.dart';
 import 'package:karing/i18n/strings.g.dart';

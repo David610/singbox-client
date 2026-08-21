@@ -666,7 +666,7 @@ class VPNServiceSetServerOptions {
 
 class VPNService {
   static ProxyConfig _current = ProxyConfig();
-  static bool _tunMode = true;
+  static final bool _tunMode = true;
   static bool _systemProxyEnable = false;
   static final List<void Function(FlutterVpnServiceState, Map<String, String>)>
   onEventStateChanged = [];

@@ -4,7 +4,6 @@
 // assets/datas/acl_codes.txt) rather than fabricating a code list.
 library;
 
-import 'package:crypto/crypto.dart';
 import 'package:flutter/services.dart';
 
 class RulesetCodesUtils {

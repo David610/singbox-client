@@ -12,7 +12,6 @@ import 'package:karing/app/utils/app_lifecycle_state_notify.dart';
 import 'package:karing/app/utils/app_utils.dart';
 import 'package:karing/app/utils/auto_update_utils.dart';
 import 'package:karing/app/utils/did.dart';
-import 'package:karing/app/utils/file_utils.dart';
 import 'package:karing/app/utils/file_saver.dart';
 import 'package:karing/app/utils/log.dart';
 import 'package:karing/app/utils/path_utils.dart';

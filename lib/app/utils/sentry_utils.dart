@@ -24,7 +24,7 @@ class SentryUtils {
       withScope: (scope) {
         scope.setTag('context', context);
         for (var i = 0; i < extra.length; i++) {
-          scope.setExtra('extra_$i', extra[i]);
+          scope.setContexts('extra_$i', extra[i]);
         }
       },
     );

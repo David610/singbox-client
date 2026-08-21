@@ -5,7 +5,6 @@ import 'package:karing/app/runtime/return_result.dart';
 import 'package:karing/app/utils/app_scheme_actions.dart';
 import 'package:karing/app/utils/log.dart';
 import 'package:karing/app/utils/platform_utils.dart';
-import 'package:karing/app/utils/proxy_conf_utils.dart';
 import 'package:karing/app/utils/system_scheme_utils.dart';
 import 'package:karing/app/utils/url_launcher_utils.dart';
 import 'package:karing/app/utils/vpn_action_handler.dart';

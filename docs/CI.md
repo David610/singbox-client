@@ -362,62 +362,83 @@ build good enough to prove the code compiles.
 
 ## Known current-state gaps (read before red CI surprises anyone)
 
-CI accurately reflects a repository that is mid-reconstruction, not a
-finished app. These are not CI bugs:
+CI accurately reflects a repository that went through a real
+reconstruction, not a finished app. Items below are marked resolved once
+a real, executed run (not just a code read) confirmed it.
 
-1. **App-level `flutter analyze`/`flutter test` are red today**, for
-   reasons unrelated to any given PR: `lib/app/utils/` (57 files) and the
-   `VPNService`/`ProxyConfig`/`ServerConfig` data models are not yet
-   reconstructed in this fork (`docs/ARCHITECTURE.md` §9). `pr-fast.yml`
-   runs these steps with `continue-on-error: true` and labels them
-   "informational" for exactly this reason — a required check that can
-   never pass isn't a merge gate, it's a permanent block. `packages/vpn_core`
-   is unaffected and IS a required, blocking check.
+1. **RESOLVED. App-level `flutter analyze`/`flutter test` are real,
+   required, blocking checks.** `lib/app/utils/` and the
+   `VPNService`/`ProxyConfig`/`ServerConfig` data models were
+   reconstructed (`docs/ARCHITECTURE.md` §9); `flutter analyze` returns
+   zero issues and `flutter test` passes on the full app suite as of this
+   workflow revision. `pr-fast.yml` no longer has `continue-on-error`
+   anywhere. Getting analyze fully clean (not just error-free) surfaced
+   several real bugs fixed along the way -- notably
+   `home_screen_widgets.dart`'s `supportedCurrentPlatfrom()` methods
+   comparing a `List<bool>` against `Platform.operatingSystem` (a
+   `String`), which made `.contains()` always return `false` regardless
+   of platform, and `diagnostics_screen.dart` computing a redacted,
+   correlatable profile identifier (`DiagnosticsSnapshot.
+   profileIdentifierRedacted`) but never actually rendering it anywhere
+   in the UI.
 
-   **Flipping app analyze/test to required**: once the reconstruction
-   work lands and a clean `flutter analyze`/`flutter test` run is
-   possible on `main`, remove the two `continue-on-error: true` lines in
-   `pr-fast.yml` (and their explanatory comments) in the same PR that
-   fixes the underlying gap — don't leave it soft-failing "for now"
-   indefinitely once it's actually fixable.
+2. **RESOLVED. `android-build.yml` and `ios-build.yml` build the pinned
+   native core from source before compiling.** Both jobs run
+   `build_android.sh`/`build_ios.sh` against the exact pinned sing-box
+   commit, verify the resulting `libbox.aar`/`Libbox.xcframework`, and
+   only then run the Flutter/Gradle/Xcode build -- so a real build either
+   succeeds against the real `io.nekohasekai.libbox` API or fails loudly,
+   never silently on a missing-artifact error unrelated to the actual
+   code. Producing the Android AAR and building the debug + release APKs
+   against it (in the environment used to prepare this revision) surfaced
+   three real, previously-unexercised defects, now fixed:
+   - `build_android.sh`/`build_ios.sh` both computed their output path as
+     `$SCRIPT_DIR/../android/libs` / `../ios/Frameworks` -- one `..` too
+     few, since `SCRIPT_DIR` is `native/singbox-go`, not `native`. This
+     silently wrote to `packages/vpn_core/native/android/libs/` instead
+     of `packages/vpn_core/android/libs/`, the path
+     `android/build.gradle`/the podspec actually check. Neither script
+     had ever been run end-to-end before, so this had never surfaced.
+   - `packages/vpn_core/android/src/main/AndroidManifest.xml` had a
+     literal `--` inside an XML comment (`... registerDefaultNetworkCallback)\n -- without it ...`),
+     which is invalid XML -- `--` is disallowed anywhere in a comment
+     body except as its closing delimiter. This failed manifest merging
+     for every real Android build, but had never been caught because no
+     environment before this one had a real Android toolchain to parse
+     it.
+   - `packages/vpn_core/android/build.gradle`'s
+     `implementation(files("libs/libbox.aar"))` fails AGP's "Direct local
+     .aar file dependencies are not supported when building an AAR"
+     check, because `vpn_core` is itself an Android library module (it
+     produces `bundleDebugAar`/`bundleReleaseAar` outputs even though the
+     app only consumes it as a project dependency). Fixed by making
+     `vpn_core`'s own dependency `compileOnly` (enough to compile
+     `SingBoxVpnService.kt` against `io.nekohasekai.libbox.*`) and adding
+     the real `implementation(files(...))` dependency directly in
+     `android/app/build.gradle.kts` instead (an application module has no
+     such restriction), so the classes still land in the final APK.
+   - `android/app/src/main/kotlin/com/nebula/karing/{TileService,
+     AutomationCommandReceiver}.kt` still referenced the pre-migration
+     `io.nebula.vpn_service.VpnServiceImpl` API (a class that no longer
+     exists anywhere in this repo), which failed Kotlin compilation
+     outright. Rewritten against the real
+     `app.singboxclient.vpn_core.SingBoxVpnService`: status display and
+     disconnect are real (`currentStatus()`/`ACTION_STOP`, the same API
+     `VpnCorePlugin`'s own Flutter EventChannel bridge uses); starting a
+     *new* connection from these entry points is honestly left
+     unimplemented (logged, not faked) since it needs a `tag` +
+     `configJson` only the running Flutter engine currently knows how to
+     build -- fabricating a fake connect path or a fake CONNECTED state
+     would have been worse than a documented gap.
 
-2. **`android-build.yml` and `ios-build.yml` are expected to fail at the
-   Dart-compile step**, for the same underlying reason as (1) — a build
-   is binary pass/fail, so unlike the fast gate's analyze/test steps,
-   these are NOT `continue-on-error`. They stay genuinely red, visibly,
-   until (1) is fixed. This was a deliberate choice: silently marking a
-   real build failure as non-blocking would hide exactly the kind of
-   regression this task asked CI to catch going forward, once the
-   baseline is fixed.
+   iOS's equivalent (`xcodebuild` compiling `Runner` + the `PacketTunnel`
+   extension against a freshly-built `Libbox.xcframework`) could not be
+   executed in the environment used to prepare this revision (no macOS
+   host) -- this is the first real run of `ios-build.yml`'s full path;
+   treat its first CI result as genuine new information, not a
+   rubber-stamp.
 
-3. **The iOS VPN extension target gap — since closed, still unverified by
-   an actual build.** This task originally asked for a job that compiles
-   "the main application AND PacketTunnel/NetworkExtension target" and
-   "fails if the VPN extension does not compile," and at the time this
-   section was first written, the Xcode project's only *registered*
-   extension target was still the old `karingService`, pointing at
-   `ios/karingService/PacketTunnelProvider.swift`, which imported the
-   still-missing `LibVpnCore` framework — registering a real target by
-   hand-editing `project.pbxproj` without Xcode available to validate the
-   result was judged too risky to attempt in a CI-only task.
-
-   In a later pass (`docs/ARCHITECTURE.md` §7), that registration WAS
-   attempted: `ios/Runner.xcodeproj/project.pbxproj` now registers a
-   `PacketTunnel` extension target with `ios/vpnCoreService/*.swift` as
-   its sources, `Libbox.xcframework` linked into it, and the old
-   `karingService`/`LibVpnCore` dead configuration removed. That edit was
-   still made by hand-editing the file's text directly, with no macOS/
-   Xcode available anywhere in that process to open the project and
-   confirm it parses or builds — so `ios-build.yml`'s `xcodebuild` step
-   against the full `Runner` scheme is the actual, real test of whether
-   that hand-edit is valid, and it has never been run against this
-   version of the file. Net effect: this workflow is ready to enforce the
-   "extension must compile" requirement and, unlike before, now has a real
-   target to compile — but whether it currently passes or fails is
-   genuinely unknown until CI (or a developer with Xcode) actually runs
-   it.
-
-4. **A real, previously-undiscovered Gradle-configuration blocker was
+3. **A real, previously-undiscovered Gradle-configuration blocker was
    found and fixed while building `android-build.yml`**:
    `android/app/build.gradle.kts` unconditionally loaded
    `../../private_for_build/karing/karing/android/sign/sentry.properties`
@@ -432,7 +453,7 @@ finished app. These are not CI bugs:
    private tree. See the inline comment at that file's `sentryKeystore`
    declaration.
 
-5. ~~`packages/vpn_core/pubspec.lock` is not committed.~~ **Resolved**: a
+4. ~~`packages/vpn_core/pubspec.lock` is not committed.~~ **Resolved**: a
    real Flutter SDK (3.44.9, matching this project's own pin) was
    obtained and used to run `flutter pub get` inside `packages/vpn_core`
    for real; the resulting `pubspec.lock` is now committed and
@@ -441,7 +462,7 @@ finished app. These are not CI bugs:
    item 6 below, which only a real `flutter pub get`/`flutter test` run
    could have surfaced.
 
-6. **The Android app's `GeneratedPluginRegistrant.java` still referenced
+5. **The Android app's `GeneratedPluginRegistrant.java` still referenced
    the deleted `vpn_service` plugin, not `vpn_core`.** `pubspec.yaml` was
    switched from `vpn_service` to `vpn_core` back in the original
    `packages/vpn_core` work, but the generated plugin registrant files

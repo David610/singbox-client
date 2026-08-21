@@ -26,6 +26,7 @@ dependencies:
   network_info_plus: 7.0.0
   connectivity_plus: 7.3.0
   package_info_plus: 9.0.0
+  build: 4.0.7 # lib/builders/build_time_builder.dart imports package:build/build.dart directly
   build_info: 2.0.0
   build_info_android: 2.0.0
   #platform_device_id: 1.0.1

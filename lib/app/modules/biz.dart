@@ -1,7 +1,6 @@
 //import 'package:device_info_plus/device_info_plus.dart';
 
 import 'package:flutter/cupertino.dart';
-import 'package:karing/app/local_services/vpn_service.dart';
 import 'package:karing/app/modules/auto_update_manager.dart';
 import 'package:karing/app/modules/board_provider_notice_manager.dart';
 import 'package:karing/app/modules/notice_manager.dart';

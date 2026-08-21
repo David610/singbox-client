@@ -6,7 +6,6 @@ import 'package:karing/app/private/app_url_utils_private.dart';
 import 'package:karing/app/runtime/return_result.dart';
 import 'package:karing/app/utils/app_utils.dart';
 import 'package:karing/app/utils/did.dart';
-import 'package:karing/app/utils/file_utils.dart';
 import 'package:karing/app/utils/file_saver.dart';
 import 'package:karing/app/utils/http_utils.dart';
 import 'package:karing/app/utils/path_utils.dart';

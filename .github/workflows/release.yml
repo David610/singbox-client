@@ -19,17 +19,15 @@ name: Release
 # manual action a human takes in the Play Console / App Store Connect UI
 # -- see docs/release/GOOGLE_PLAY.md and docs/release/APPLE.md.
 #
-# KNOWN CURRENT STATE, read before a red run surprises anyone: every gate
-# job below is expected to behave exactly as its own workflow file
-# documents when run standalone (docs/CI.md "Known current-state gaps")
-# -- app-level analyze/test informational-red, Android/iOS builds
-# genuinely red until lib/app/utils/ and the iOS extension target gap are
-# resolved. This release workflow does not lower that bar; it enforces
-# it as a hard release gate (no continue-on-error here, unlike
-# pr-fast.yml's two informational steps) -- a release cannot ship while
-# those gaps are open, which is the correct behavior for a *release*
-# pipeline even though pr-fast.yml deliberately doesn't block PRs on the
-# same thing.
+# Every gate job below (fast-checks, compat-checks, supply-chain-checks,
+# android-debug-smoke, ios-debug-smoke) is a real, required, blocking
+# check as of this workflow revision -- there is no continue-on-error
+# anywhere in this pipeline, PR or release. The android/ios-release-build
+# jobs below build their OWN copy of the pinned sing-box/libbox core from
+# source (same scripts, same pin, as android-build.yml/ios-build.yml) --
+# a release build runs on a fresh runner and does not inherit artifacts
+# from the gate jobs, so it cannot skip that step and still produce a
+# real signed binary.
 
 on:
   push:
@@ -54,6 +52,25 @@ permissions:
 env:
   FLUTTER_VERSION: "3.44.9" # see docs/CI.md "Pinned versions"
   ANDROID_PACKAGE_NAME: "com.nebula.karing" # android/app/build.gradle.kts applicationId -- update here post-rebrand, see docs/FORK_ARCHITECTURE_AUDIT.md §10
+  # ios/Runner.xcodeproj/project.pbxproj PRODUCT_BUNDLE_IDENTIFIER for the
+  # Runner (host app) target -- currently the same string as
+  # ANDROID_PACKAGE_NAME (see docs/FORK_ARCHITECTURE_AUDIT.md), kept as
+  # its own variable rather than reused so the two can diverge later
+  # without silently breaking iOS signing.
+  IOS_HOST_BUNDLE_ID: "com.nebula.karing"
+  # ios/Runner.xcodeproj/project.pbxproj PRODUCT_BUNDLE_IDENTIFIER for the
+  # PacketTunnel Network Extension target -- a real, separately-signable
+  # product (see docs/ARCHITECTURE.md §7), not a sub-target of Runner.
+  IOS_EXTENSION_BUNDLE_ID: "com.nebula.karing.PacketTunnel"
+  # Native sing-box/libbox core -- same pin, same build path as
+  # android-build.yml/ios-build.yml (packages/vpn_core/UPSTREAM_VERSION.md).
+  # A release build is a fresh runner just like those gate jobs: it does
+  # NOT inherit libbox.aar/Libbox.xcframework from them, so it must
+  # produce its own via the identical canonical scripts, not a copy.
+  GO_VERSION: "1.24.7"
+  NDK_VERSION: "28.2.13676358"
+  SING_BOX_PIN_TAG: "v1.13.19"
+  SING_BOX_PIN_COMMIT: "b5ebaa1fc0f2b94256180b95468e73ef53caa27d"
 
 jobs:
   # ---------------------------------------------------------------
@@ -150,6 +167,49 @@ jobs:
       - name: Set up Android SDK
         uses: android-actions/setup-android@40fd30fb8d7440372e1316f5d1809ec01dcd3699 # v4.0.1
 
+      - name: Install Android NDK ${{ env.NDK_VERSION }}
+        run: sdkmanager --install "ndk;${{ env.NDK_VERSION }}"
+
+      - name: Set up Go ${{ env.GO_VERSION }}
+        uses: actions/setup-go@44694675825211faa026b3c33043df3e48a5fa00 # v6.0.0
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: false
+
+      - name: Verify the sing-box pin is consistent everywhere it's recorded
+        run: packages/vpn_core/native/singbox-go/check_pin_consistency.sh
+
+      - name: Cache Go build/module cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/go/pkg/mod
+            ~/.cache/go-build
+          key: go-singbox-android-${{ env.SING_BOX_PIN_COMMIT }}
+          restore-keys: go-singbox-android-
+
+      - name: Install gomobile/gobind (sagernet fork, pinned by sing-box's own Makefile)
+        run: |
+          go install -v github.com/sagernet/gomobile/cmd/gomobile@v0.1.12
+          go install -v github.com/sagernet/gomobile/cmd/gobind@v0.1.12
+          echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
+
+      - name: Build libbox.aar from the pinned sing-box source
+        env:
+          ANDROID_NDK_HOME: ${{ env.ANDROID_HOME }}/ndk/${{ env.NDK_VERSION }}
+          ANDROID_NDK_ROOT: ${{ env.ANDROID_HOME }}/ndk/${{ env.NDK_VERSION }}
+        run: packages/vpn_core/native/singbox-go/build_android.sh
+
+      - name: Verify libbox.aar was produced at the pinned commit
+        run: |
+          set -euo pipefail
+          test -f packages/vpn_core/android/libs/libbox.aar
+          ACTUAL_COMMIT="$(git -C packages/vpn_core/native/singbox-go/.sing-box-checkout rev-parse HEAD)"
+          if [ "$ACTUAL_COMMIT" != "${{ env.SING_BOX_PIN_COMMIT }}" ]; then
+            echo "::error::checked-out sing-box commit ($ACTUAL_COMMIT) does not match the pin (${{ env.SING_BOX_PIN_COMMIT }})"
+            exit 1
+          fi
+
       - name: Set up Flutter ${{ env.FLUTTER_VERSION }}
         uses: subosito/flutter-action@1508160852fb97248640997f7cfb38da241df0ba # v2.9.1
         with:
@@ -233,6 +293,43 @@ jobs:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
+      - name: Set up Go ${{ env.GO_VERSION }}
+        uses: actions/setup-go@44694675825211faa026b3c33043df3e48a5fa00 # v6.0.0
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: false
+
+      - name: Verify the sing-box pin is consistent everywhere it's recorded
+        run: packages/vpn_core/native/singbox-go/check_pin_consistency.sh
+
+      - name: Cache Go build/module cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/go/pkg/mod
+            ~/Library/Caches/go-build
+          key: go-singbox-ios-${{ env.SING_BOX_PIN_COMMIT }}
+          restore-keys: go-singbox-ios-
+
+      - name: Install gomobile/gobind (sagernet fork, pinned by sing-box's own Makefile)
+        run: |
+          go install -v github.com/sagernet/gomobile/cmd/gomobile@v0.1.12
+          go install -v github.com/sagernet/gomobile/cmd/gobind@v0.1.12
+          echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
+
+      - name: Build Libbox.xcframework from the pinned sing-box source
+        run: packages/vpn_core/native/singbox-go/build_ios.sh
+
+      - name: Verify Libbox.xcframework was produced at the pinned commit
+        run: |
+          set -euo pipefail
+          test -d packages/vpn_core/ios/Frameworks/Libbox.xcframework
+          ACTUAL_COMMIT="$(git -C packages/vpn_core/native/singbox-go/.sing-box-checkout rev-parse HEAD)"
+          if [ "$ACTUAL_COMMIT" != "${{ env.SING_BOX_PIN_COMMIT }}" ]; then
+            echo "::error::checked-out sing-box commit ($ACTUAL_COMMIT) does not match the pin (${{ env.SING_BOX_PIN_COMMIT }})"
+            exit 1
+          fi
+
       - name: Set up Flutter ${{ env.FLUTTER_VERSION }}
         uses: subosito/flutter-action@1508160852fb97248640997f7cfb38da241df0ba # v2.9.1
         with:
@@ -250,15 +347,31 @@ jobs:
         working-directory: ios
         run: pod install --repo-update
 
-      - name: Import signing certificate and provisioning profile(s)
+      - name: Import signing certificate and provisioning profiles
+        # Two profiles: the Runner host app and the PacketTunnel Network
+        # Extension are two separately-signable products (each with its
+        # own PRODUCT_BUNDLE_IDENTIFIER in project.pbxproj -- see
+        # docs/ARCHITECTURE.md §7), so each needs its own provisioning
+        # profile. Both secrets fail the build explicitly if absent,
+        # rather than silently signing/exporting only the host app and
+        # producing an IPA whose extension can't actually install.
         env:
           IOS_DIST_CERTIFICATE_P12_BASE64: ${{ secrets.IOS_DIST_CERTIFICATE_P12_BASE64 }}
           IOS_DIST_CERTIFICATE_PASSWORD: ${{ secrets.IOS_DIST_CERTIFICATE_PASSWORD }}
           IOS_PROVISIONING_PROFILE_BASE64: ${{ secrets.IOS_PROVISIONING_PROFILE_BASE64 }}
+          IOS_EXTENSION_PROVISIONING_PROFILE_BASE64: ${{ secrets.IOS_EXTENSION_PROVISIONING_PROFILE_BASE64 }}
         run: |
           set -euo pipefail
           if [ -z "${IOS_DIST_CERTIFICATE_P12_BASE64:-}" ]; then
             echo "::error::IOS_DIST_CERTIFICATE_P12_BASE64 is not set on the ios-release Environment. See docs/release/RELEASE_CHECKLIST.md."
+            exit 1
+          fi
+          if [ -z "${IOS_PROVISIONING_PROFILE_BASE64:-}" ]; then
+            echo "::error::IOS_PROVISIONING_PROFILE_BASE64 (host app, ${{ env.IOS_HOST_BUNDLE_ID }}) is not set on the ios-release Environment. See docs/release/RELEASE_CHECKLIST.md."
+            exit 1
+          fi
+          if [ -z "${IOS_EXTENSION_PROVISIONING_PROFILE_BASE64:-}" ]; then
+            echo "::error::IOS_EXTENSION_PROVISIONING_PROFILE_BASE64 (PacketTunnel extension, ${{ env.IOS_EXTENSION_BUNDLE_ID }}) is not set on the ios-release Environment. See docs/release/RELEASE_CHECKLIST.md."
             exit 1
           fi
           KEYCHAIN="$RUNNER_TEMP/release-signing.keychain-db"
@@ -277,23 +390,22 @@ jobs:
           mkdir -p "$HOME/Library/MobileDevice/Provisioning Profiles"
           echo "$IOS_PROVISIONING_PROFILE_BASE64" | base64 -d \
             > "$HOME/Library/MobileDevice/Provisioning Profiles/release.mobileprovision"
-          # KNOWN GAP (see this workflow's header and docs/CI.md "iOS
-          # extension target gap"): a second profile for the
-          # PacketTunnel/NetworkExtension target
-          # (IOS_EXTENSION_PROVISIONING_PROFILE_BASE64) is provisioned
-          # for by docs/release/RELEASE_CHECKLIST.md but not imported
-          # here yet -- the Xcode project does not register that target
-          # as a separate signable product today, so there is nothing
-          # for a second profile to sign against until that lands.
+          echo "$IOS_EXTENSION_PROVISIONING_PROFILE_BASE64" | base64 -d \
+            > "$HOME/Library/MobileDevice/Provisioning Profiles/release-extension.mobileprovision"
 
       - name: Write ExportOptions.plist
         env:
           IOS_TEAM_ID: ${{ secrets.IOS_TEAM_ID }}
           IOS_PROVISIONING_PROFILE_NAME: ${{ secrets.IOS_PROVISIONING_PROFILE_NAME }}
+          IOS_EXTENSION_PROVISIONING_PROFILE_NAME: ${{ secrets.IOS_EXTENSION_PROVISIONING_PROFILE_NAME }}
         run: |
           set -euo pipefail
           if [ -z "${IOS_TEAM_ID:-}" ]; then
             echo "::error::IOS_TEAM_ID is not set on the ios-release Environment."
+            exit 1
+          fi
+          if [ -z "${IOS_EXTENSION_PROVISIONING_PROFILE_NAME:-}" ]; then
+            echo "::error::IOS_EXTENSION_PROVISIONING_PROFILE_NAME (PacketTunnel extension, ${{ env.IOS_EXTENSION_BUNDLE_ID }}) is not set on the ios-release Environment."
             exit 1
           fi
           cat > "$RUNNER_TEMP/ExportOptions.plist" <<EOF
@@ -309,21 +421,16 @@ jobs:
             <string>manual</string>
             <key>provisioningProfiles</key>
             <dict>
-              <key>${{ env.ANDROID_PACKAGE_NAME }}</key>
+              <key>${{ env.IOS_HOST_BUNDLE_ID }}</key>
               <string>${IOS_PROVISIONING_PROFILE_NAME}</string>
+              <key>${{ env.IOS_EXTENSION_BUNDLE_ID }}</key>
+              <string>${IOS_EXTENSION_PROVISIONING_PROFILE_NAME}</string>
             </dict>
             <key>uploadSymbols</key>
             <true/>
           </dict>
           </plist>
           EOF
-        # NOTE: the <key> under provisioningProfiles must be the iOS
-        # bundle identifier, not the Android package name -- env.ANDROID_PACKAGE_NAME
-        # is reused here ONLY because this fork's iOS and Android
-        # applicationId/bundle ID happen to share the same string today
-        # (com.nebula.karing) per docs/FORK_ARCHITECTURE_AUDIT.md. If
-        # that ever diverges, introduce a separate IOS_BUNDLE_ID env var
-        # here rather than assuming they match.
 
       - name: flutter build ipa (signed, App Store method)
         run: >

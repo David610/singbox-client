@@ -3,6 +3,11 @@
 // settings_screen.dart, setting_manager.dart). Field names and JSON keys
 // match sing-box's own documented outbound/inbound config schema (public
 // -- https://sing-box.sagernet.org/configuration/), not guessed.
+//
+// ignore_for_file: non_constant_identifier_names -- several fields below
+// are deliberately snake_case because their Dart identifier IS the
+// sing-box JSON key (see toJson()/fromJsonStatic() in the same class),
+// not a stray naming-convention slip.
 import 'package:flutter/widgets.dart';
 import 'package:karing/screens/group_item_options.dart';
 import 'package:karing/screens/group_item_creator.dart';
@@ -460,4 +465,4 @@ class SingboxOutboundMultiplexBrutalOptions {
 /// Domains excluded from the local HTTP proxy by default (Apple push and
 /// other services that misbehave when proxied) -- matches this app's own
 /// `excludeApns`-adjacent settings, not a sing-box schema constant.
-const List<String> ProxyBypassDoaminsDefault = ["push.apple.com"];
+const List<String> proxyBypassDomainsDefault = ["push.apple.com"];

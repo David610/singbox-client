@@ -1,44 +1,25 @@
 name: iOS build
 
-# Builds the Flutter app for iOS (no code signing) and, separately,
-# compiles the FULL Xcode scheme via `xcodebuild` -- which is what
-# actually forces the embedded PacketTunnel/NetworkExtension target to
-# compile, since `flutter build ios` alone only builds the Runner app
-# target and silently ignores embedded extensions.
+# Builds the pinned Libbox.xcframework from source, then builds the
+# Flutter app for iOS (no code signing) and, separately, compiles the
+# FULL Xcode scheme via `xcodebuild` -- which is what actually forces the
+# embedded PacketTunnel/NetworkExtension target to compile, since
+# `flutter build ios` alone only builds the Runner app target and
+# silently ignores embedded extensions.
 #
-# KNOWN CURRENT STATE, stated plainly rather than papered over (this is
-# the single most important comment in this file):
+# The native-core build (through "Verify Libbox.xcframework contents") is
+# the load-bearing part of this job: the PacketTunnel extension target in
+# ios/Runner.xcodeproj/project.pbxproj links Libbox.xcframework directly
+# (see docs/ARCHITECTURE.md §7), so without that framework present the
+# link step fails before the hand-edited pbxproj target registration
+# itself is ever really exercised. This job's `xcodebuild` step is the
+# actual validation of whether that target registration is structurally
+# correct Xcode project data.
 #
-#   1. `flutter build ios` is expected to fail today at the Dart-compile
-#      step, for the same pre-existing reasons as pr-fast.yml's app
-#      analyze/test (docs/ARCHITECTURE.md §9).
-#   2. EVEN IF (1) is fixed, `xcodebuild` compiling the full `Runner`
-#      scheme is STILL expected to fail on the embedded extension target,
-#      but for a different reason now: the Xcode project DOES register a
-#      real "PacketTunnel" extension target (ios/vpnCoreService/*.swift,
-#      see docs/ARCHITECTURE.md §7 and docs/BUILDING.md "iOS"), but that
-#      target links Libbox.xcframework, which this job never builds --
-#      there is no step here running
-#      packages/vpn_core/native/singbox-go/build_ios.sh first. Until such
-#      a step is added (it needs Go + Xcode's toolchain + gomobile and is
-#      a meaningfully slower job than the rest of this workflow, so it
-#      was not added speculatively), the link step for PacketTunnel will
-#      fail with a missing-framework error, not a missing-target error.
-#      The target registration itself was also hand-edited into
-#      project.pbxproj directly (no Xcode available to add it through the
-#      UI or validate the result) -- this job is the first real test of
-#      whether that hand-edit is even structurally valid Xcode project
-#      data, independent of whether Libbox.xcframework exists.
-#
-# This job is intentionally NOT continue-on-error: per this task's own
-# instruction ("fail if the VPN extension does not compile"), a build
-# step is binary pass/fail by nature. It stays red, honestly, until both
-# of the above are addressed -- see docs/CI.md "iOS extension target gap".
-#
-# Do not read a green run of this workflow (once it exists) as proof the
-# app works on a real iPhone -- a simulator/unsigned build proves the
-# code compiles, nothing about NetworkExtension actually functioning on
-# device. See docs/SINGBOX_VPN_COMPATIBILITY.md.
+# Do not read a green run of this workflow as proof the app works on a
+# real iPhone -- a simulator/unsigned build proves the code compiles,
+# nothing about NetworkExtension actually functioning on device. See
+# docs/SINGBOX_VPN_COMPATIBILITY.md.
 
 on:
   pull_request:
@@ -58,6 +39,9 @@ permissions:
 env:
   FLUTTER_VERSION: "3.44.9" # see docs/CI.md "Pinned versions"
   COCOAPODS_VERSION: "1.16.2" # pinned in ios/Podfile.lock ("COCOAPODS:")
+  GO_VERSION: "1.24.7" # must match packages/vpn_core/native/singbox-go/go.mod's `go` directive
+  SING_BOX_PIN_TAG: "v1.13.19" # packages/vpn_core/UPSTREAM_VERSION.md
+  SING_BOX_PIN_COMMIT: "b5ebaa1fc0f2b94256180b95468e73ef53caa27d"
 
 jobs:
   ios-build:
@@ -66,6 +50,63 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Go ${{ env.GO_VERSION }}
+        uses: actions/setup-go@44694675825211faa026b3c33043df3e48a5fa00 # v6.0.0
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: false # cache keyed manually below against the pinned commit
+
+      - name: Verify the sing-box pin is consistent everywhere it's recorded
+        run: packages/vpn_core/native/singbox-go/check_pin_consistency.sh
+
+      - name: Cache Go build/module cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/go/pkg/mod
+            ~/Library/Caches/go-build
+          key: go-singbox-ios-${{ env.SING_BOX_PIN_COMMIT }}
+          restore-keys: go-singbox-ios-
+
+      - name: Install gomobile/gobind (sagernet fork, pinned by sing-box's own Makefile)
+        # Same fork+version as android-build.yml -- see that workflow's
+        # equivalent step for why it must be this fork, not
+        # golang.org/x/mobile.
+        run: |
+          go install -v github.com/sagernet/gomobile/cmd/gomobile@v0.1.12
+          go install -v github.com/sagernet/gomobile/cmd/gobind@v0.1.12
+          echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
+
+      - name: Build Libbox.xcframework from the pinned sing-box source
+        run: packages/vpn_core/native/singbox-go/build_ios.sh
+
+      - name: Verify Libbox.xcframework was produced at the pinned commit
+        run: |
+          set -euo pipefail
+          test -d packages/vpn_core/ios/Frameworks/Libbox.xcframework
+          echo "Built Libbox.xcframework from sing-box ${{ env.SING_BOX_PIN_TAG }} / ${{ env.SING_BOX_PIN_COMMIT }}"
+          ACTUAL_COMMIT="$(git -C packages/vpn_core/native/singbox-go/.sing-box-checkout rev-parse HEAD)"
+          if [ "$ACTUAL_COMMIT" != "${{ env.SING_BOX_PIN_COMMIT }}" ]; then
+            echo "::error::checked-out sing-box commit ($ACTUAL_COMMIT) does not match the pin (${{ env.SING_BOX_PIN_COMMIT }})"
+            exit 1
+          fi
+
+      - name: Verify Libbox.xcframework contents (sanity check)
+        run: |
+          set -euo pipefail
+          FRAMEWORK=packages/vpn_core/ios/Frameworks/Libbox.xcframework
+          find "$FRAMEWORK" -maxdepth 1
+          plutil -p "$FRAMEWORK/Info.plist"
+          # Confirm at least one real iOS device (arm64, not simulator)
+          # slice exists -- what an actual on-device build/TestFlight
+          # binary needs, not just a simulator slice.
+          IOS_DEVICE_SLICE="$(find "$FRAMEWORK" -maxdepth 1 -type d -iname 'ios-arm64' | head -1)"
+          if [ -z "$IOS_DEVICE_SLICE" ]; then
+            echo "::error::Libbox.xcframework has no ios-arm64 (device) slice"
+            exit 1
+          fi
+          lipo -info "$IOS_DEVICE_SLICE"/Libbox.framework/Libbox
 
       - name: Set up Flutter ${{ env.FLUTTER_VERSION }}
         uses: subosito/flutter-action@1508160852fb97248640997f7cfb38da241df0ba # v2.9.1
@@ -106,7 +147,7 @@ jobs:
         # see this file's header.
         run: flutter build ios --release --no-codesign
 
-      - name: xcodebuild Runner scheme (forces the embedded VPN extension to compile)
+      - name: xcodebuild Runner scheme (forces the embedded VPN extension to compile against the real Libbox.xcframework)
         working-directory: ios
         run: |
           xcodebuild build \
@@ -125,8 +166,8 @@ jobs:
           {
             echo "### iOS build"
             echo ""
-            echo "See this workflow file's header comment for exactly why"
-            echo "this is expected to be red today (missing Libbox.xcframework"
-            echo "build step, and an unverified hand-edited pbxproj target)"
-            echo "and what unblocks it."
+            echo "Native core: sing-box ${{ env.SING_BOX_PIN_TAG }} / ${{ env.SING_BOX_PIN_COMMIT }}"
+            echo "Builds and links the real Libbox.xcframework, and compiles both"
+            echo "the Runner app target and the PacketTunnel extension target"
+            echo "against it."
           } >> "$GITHUB_STEP_SUMMARY"

@@ -5,15 +5,15 @@ import 'dart:async';
 
 import 'package:flutter/widgets.dart';
 
-typedef _StateCallback = FutureOr<void> Function();
+typedef StateCallback = FutureOr<void> Function();
 
 class AppLifecycleStateNofity extends WidgetsBindingObserver {
   AppLifecycleStateNofity._();
 
   static final AppLifecycleStateNofity _instance = AppLifecycleStateNofity._();
 
-  static final Map<Object, _StateCallback> _resumedCallbacks = {};
-  static final Map<Object, _StateCallback> _pausedCallbacks = {};
+  static final Map<Object, StateCallback> _resumedCallbacks = {};
+  static final Map<Object, StateCallback> _pausedCallbacks = {};
 
   static bool _paused = false;
 
@@ -29,7 +29,7 @@ class AppLifecycleStateNofity extends WidgetsBindingObserver {
 
   static bool isPaused() => _paused;
 
-  static void onStateResumed(Object? key, _StateCallback? callback) {
+  static void onStateResumed(Object? key, StateCallback? callback) {
     final k = key ?? callback;
     if (callback == null || k == null) {
       if (k != null) {
@@ -40,7 +40,7 @@ class AppLifecycleStateNofity extends WidgetsBindingObserver {
     _resumedCallbacks[k] = callback;
   }
 
-  static void onStatePaused(Object? key, _StateCallback? callback) {
+  static void onStatePaused(Object? key, StateCallback? callback) {
     final k = key ?? callback;
     if (callback == null || k == null) {
       if (k != null) {
@@ -68,14 +68,14 @@ class AppLifecycleStateNofity extends WidgetsBindingObserver {
 
   static Future<void> stateResumed(String reason) async {
     _paused = false;
-    for (final cb in List<_StateCallback>.from(_resumedCallbacks.values)) {
+    for (final cb in List<StateCallback>.from(_resumedCallbacks.values)) {
       await cb();
     }
   }
 
   static Future<void> statePaused(String reason) async {
     _paused = true;
-    for (final cb in List<_StateCallback>.from(_pausedCallbacks.values)) {
+    for (final cb in List<StateCallback>.from(_pausedCallbacks.values)) {
       await cb();
     }
   }

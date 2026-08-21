@@ -126,6 +126,28 @@ for exactly what that means and what to check first.
 
 ## What could not be verified in this environment
 
+**Update (CI/CD trustworthiness pass):** this section originally
+described the state after the initial Dart/Kotlin/Swift reconstruction,
+written with no Flutter SDK, Android SDK/NDK, or macOS available at all.
+Since then, a real Flutter SDK, Android SDK/NDK, and JDK 17 were obtained
+and every Android bullet below was actually re-verified, not just
+re-read: `build_android.sh` was run end-to-end against the pinned
+sing-box commit, produced a real `libbox.aar` (all four ABIs), and both
+`flutter build apk --debug` and `flutter build apk --release` compiled
+`SingBoxVpnService.kt`/`VpnPlatformInterface.kt` against the real
+generated `io.nekohasekai.libbox.*` API and linked successfully -- this
+surfaced and fixed several real defects (wrong output path in
+`build_android.sh`, an invalid `--` inside an XML comment in
+`AndroidManifest.xml`, an AGP local-AAR bundling restriction, and two
+Kotlin files still referencing the pre-migration `vpn_service` API), all
+now fixed (see `docs/CI.md`'s "Known current-state gaps"). The Android
+bullet below is kept for its historical verification methodology (how the
+Kotlin was cross-checked against real signatures before a compiler was
+available) but its risk framing ("not verified by a compiler") no longer
+reflects the current state. macOS/Xcode/iOS remains genuinely
+unverified in any environment this repository's history has had access
+to -- `ios-build.yml`'s first real run is the first actual test of it.
+
 Stated plainly, per this task's own instructions ("never fake a build"):
 
 - **No Flutter/Dart SDK is installed here.** `flutter pub get`,

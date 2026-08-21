@@ -96,11 +96,7 @@ class HttpUtils {
         url,
         options: Options(
           responseType: ResponseType.bytes,
-          headers: {
-            if (userAgent != null) 'User-Agent': userAgent,
-            if (xhwid != null) 'X-HWID': xhwid,
-            ...?headers,
-          },
+          headers: {'User-Agent': ?userAgent, 'X-HWID': ?xhwid, ...?headers},
         ),
       );
       final statusCode = response.statusCode ?? 0;
@@ -131,12 +127,7 @@ class HttpUtils {
       final dio = _client(proxyPort, timeout);
       final response = await dio.headUri<void>(
         url,
-        options: Options(
-          headers: {
-            'User-Agent': userAgent,
-            if (xhwid != null) 'X-HWID': xhwid,
-          },
-        ),
+        options: Options(headers: {'User-Agent': userAgent, 'X-HWID': ?xhwid}),
       );
       final statusCode = response.statusCode ?? 0;
       if (statusCode < 200 || statusCode >= 300) {
@@ -172,11 +163,7 @@ class HttpUtils {
         data: body,
         options: Options(
           responseType: ResponseType.bytes,
-          headers: {
-            if (userAgent != null) 'User-Agent': userAgent,
-            if (xhwid != null) 'X-HWID': xhwid,
-            ...?headers,
-          },
+          headers: {'User-Agent': ?userAgent, 'X-HWID': ?xhwid, ...?headers},
         ),
       );
       final statusCode = response.statusCode ?? 0;
@@ -215,9 +202,7 @@ class HttpUtils {
       final response = await dio.downloadUri(
         url,
         savePath,
-        options: Options(
-          headers: {if (userAgent != null) 'User-Agent': userAgent},
-        ),
+        options: Options(headers: {'User-Agent': ?userAgent}),
       );
       final statusCode = response.statusCode ?? 0;
       if (statusCode < 200 || statusCode >= 300) {
@@ -251,9 +236,7 @@ class HttpUtils {
       final response = await dio.postUri<void>(
         url,
         data: formData,
-        options: Options(
-          headers: {if (userAgent != null) 'User-Agent': userAgent},
-        ),
+        options: Options(headers: {'User-Agent': ?userAgent}),
       );
       final statusCode = response.statusCode ?? 0;
       if (statusCode < 200 || statusCode >= 300) {

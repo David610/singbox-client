@@ -16,7 +16,6 @@ import 'package:karing/app/utils/install_referrer_utils.dart';
 import 'package:karing/app/utils/log.dart';
 import 'package:karing/app/utils/path_utils.dart';
 import 'package:karing/app/utils/platform_utils.dart';
-import 'package:karing/app/utils/proxy_conf_utils.dart';
 import 'package:karing/app/utils/singbox_json_utils.dart';
 import 'package:karing/app/utils/url_launcher_utils.dart';
 import 'package:karing/i18n/strings.g.dart';

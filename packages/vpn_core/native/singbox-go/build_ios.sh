@@ -19,7 +19,7 @@ PIN_TAG="v1.13.19"
 PIN_COMMIT="b5ebaa1fc0f2b94256180b95468e73ef53caa27d"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-OUT_DIR="$SCRIPT_DIR/../ios/Frameworks"
+OUT_DIR="$SCRIPT_DIR/../../ios/Frameworks"
 WORK_DIR="${SING_BOX_CHECKOUT:-$SCRIPT_DIR/.sing-box-checkout}"
 
 if [ ! -d "$WORK_DIR" ]; then

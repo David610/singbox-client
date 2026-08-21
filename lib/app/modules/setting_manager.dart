@@ -7,19 +7,14 @@ import 'dart:math';
 import 'package:country/country.dart' as country;
 import 'package:flutter/widgets.dart';
 import 'package:karing/app/utils/file_saver.dart';
-import 'package:karing/app/local_services/vpn_service.dart';
 import 'package:karing/app/runtime/type_checker.dart';
 import 'package:karing/app/utils/app_utils.dart';
-import 'package:karing/app/utils/cloudflare_warp_api.dart';
 import 'package:karing/app/utils/cloudflare_warp_utils.dart';
 import 'package:karing/app/utils/convert_utils.dart';
-import 'package:karing/app/utils/file_utils.dart';
 import 'package:karing/app/utils/log.dart';
 import 'package:karing/app/utils/network_utils.dart';
 import 'package:karing/app/utils/path_utils.dart';
 import 'package:karing/app/utils/platform_utils.dart';
-import 'package:karing/app/utils/proxy_conf_utils.dart';
-import 'package:karing/app/utils/singbox_config_builder.dart';
 import 'package:karing/app/utils/singbox_outbound.dart';
 import 'package:karing/i18n/strings.g.dart';
 import 'package:karing/screens/widgets/text_field.dart';
@@ -502,7 +497,7 @@ class SettingConfigItemTUN {
   bool allowBypass = false; //android
   bool appendHttpProxy =
       getAppendHttp(); //android, ios: some apps skip tun route
-  List<String> allowBypassHttpProxyDomains = ProxyBypassDoaminsDefault.toList();
+  List<String> allowBypassHttpProxyDomains = proxyBypassDomainsDefault.toList();
   bool hijackDns = true;
   String loopbackAddress = "";
   List<String> routeExcludeAddress = [];
@@ -587,7 +582,7 @@ class SettingConfigItemTUN {
     allowBypassHttpProxyDomains = ConvertUtils.getListStringFromDynamic(
       map["allow_bypass_httpproxy_domains"],
       true,
-      ProxyBypassDoaminsDefault.toList(),
+      proxyBypassDomainsDefault.toList(),
     )!;
     hijackDns = map["hijack_dns"] ?? true;
     loopbackAddress = map["loopback_address"] ?? "";
@@ -1174,7 +1169,7 @@ class SettingConfigItemProxy {
   int controlPort = controlPortDefault;
   int clusterPort = clusterPortDefault;
   bool autoSetSystemProxy = getAutoSetSystemProxyDefault();
-  List<String> systemProxyBypassDomain = ProxyBypassDoaminsDefault.toList();
+  List<String> systemProxyBypassDomain = proxyBypassDomainsDefault.toList();
   bool disconnectWhenQuit = getDisconnectWhenQuitDefault();
   bool autoAddToFirewall = true;
   String socksLocalUsername = "";
@@ -1263,7 +1258,7 @@ class SettingConfigItemProxy {
     systemProxyBypassDomain = ConvertUtils.getListStringFromDynamic(
       map["system_proxy_bypass_domain"],
       true,
-      ProxyBypassDoaminsDefault.toList(),
+      proxyBypassDomainsDefault.toList(),
     )!;
     disconnectWhenQuit =
         map["disconnect_when_quit"] ?? getDisconnectWhenQuitDefault();

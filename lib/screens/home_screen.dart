@@ -46,7 +46,6 @@ import 'package:karing/app/utils/network_utils.dart';
 import 'package:karing/app/utils/path_utils.dart';
 import 'package:karing/app/utils/platform_utils.dart';
 import 'package:karing/app/utils/proxy_conf_utils.dart';
-import 'package:karing/app/utils/singbox_config_builder.dart';
 import 'package:karing/app/utils/system_scheme_utils.dart';
 import 'package:karing/app/utils/url_launcher_utils.dart';
 import 'package:karing/app/utils/vpn_action_handler.dart';
@@ -88,7 +87,6 @@ import 'package:provider/provider.dart';
 import 'package:quick_actions/quick_actions.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:tuple/tuple.dart';
-import 'package:karing/app/modules/vpn_service_state.dart';
 import 'package:window_manager/window_manager.dart';
 
 class WidgetImportExport {

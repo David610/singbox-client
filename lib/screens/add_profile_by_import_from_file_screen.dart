@@ -6,8 +6,6 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:karing/app/modules/server_manager.dart';
 import 'package:karing/app/runtime/return_result.dart';
-import 'package:karing/app/utils/auto_conf_utils.dart';
-import 'package:karing/app/utils/proxy_conf_utils.dart';
 import 'package:karing/i18n/strings.g.dart';
 import 'package:karing/screens/dialog_utils.dart';
 import 'package:karing/screens/group_helper.dart';

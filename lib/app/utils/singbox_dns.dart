@@ -24,7 +24,7 @@ class SingboxDNSServerBatchOptions {
 /// Parses each entry in [urls] into a `SingboxDNSServerBatchOptions`-
 /// compatible server tag list, one server per URL, tagged
 /// `dns_latency_test_<index>`, and optionally routed through [detour].
-ReturnResult<List<SingboxDNSServerBatchOptions>> SingboxDNSTryParseList(
+ReturnResult<List<SingboxDNSServerBatchOptions>> singboxDNSTryParseList(
   List<String> urls,
   String? detour,
   SingboxDNSDomainResolver resolver,

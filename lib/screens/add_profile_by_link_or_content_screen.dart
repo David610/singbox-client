@@ -7,7 +7,6 @@ import 'package:flutter/material.dart';
 import 'package:karing/app/modules/server_manager.dart';
 import 'package:karing/app/modules/setting_manager.dart';
 import 'package:karing/app/runtime/return_result.dart';
-import 'package:karing/app/utils/auto_conf_utils.dart';
 import 'package:karing/app/utils/http_utils.dart';
 import 'package:karing/app/utils/proxy_conf_utils.dart';
 import 'package:karing/app/utils/system_scheme_utils.dart';

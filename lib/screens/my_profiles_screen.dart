@@ -16,7 +16,6 @@ import 'package:karing/app/utils/accessibility_utils.dart';
 import 'package:karing/app/utils/error_reporter_utils.dart';
 import 'package:karing/app/utils/file_utils.dart';
 import 'package:karing/app/utils/path_utils.dart';
-import 'package:karing/app/utils/proxy_conf_utils.dart';
 import 'package:karing/app/utils/ruleset_codes_utils.dart';
 import 'package:karing/app/utils/singbox_config_builder.dart';
 import 'package:karing/app/utils/singbox_outbound.dart';
