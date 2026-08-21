@@ -10,7 +10,13 @@ Pod::Spec.new do |s|
   NEPacketTunnelProvider on iOS. See docs/ARCHITECTURE.md.
   DESC
   s.homepage         = 'https://github.com/David610/singbox-client'
-  s.license          = { :file => '../../../LICENSE.md' }
+  # CocoaPods resolves this relative to the *symlinked* podspec path
+  # Flutter's plugin loader creates (ios/.symlinks/plugins/vpn_core/ios/),
+  # not the real packages/vpn_core/ios/ location -- confirmed by a real
+  # `pod install` run, which reported the (wrong, 3-levels-up) prior value
+  # resolving to ios/.symlinks/LICENSE.md. From that symlinked depth, 5
+  # levels up reaches the actual repo root.
+  s.license          = { :file => '../../../../../LICENSE.md' }
   s.author           = { 'singbox-client' => 'noreply@example.invalid' }
   s.source           = { :path => '.' }
   s.source_files     = 'Classes/**/*'
