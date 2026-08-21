@@ -68,7 +68,11 @@ app.*.map.json
 /bind/linux/core
 ios/karingWidget/VpnServiceHandler.swift
 /.idea/workspace.xml
-/lib/app/private
+# lib/app/private/ used to be gitignored (upstream Karing kept real
+# secrets there, out of version control). It's now tracked: its contents
+# are reconstructed and deliberately blank (no secrets), and the app
+# doesn't compile without the files existing -- see that directory's own
+# doc comments and docs/ARCHITECTURE.md.
 /android/app/build
 /.sentry-native
 /dist/ios

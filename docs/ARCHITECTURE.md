@@ -289,38 +289,88 @@ tree compile. Specifically, in priority order:
    the direct next implementation task — see `docs/BUILDING.md` "Next
    implementation task".
 
-2. **`lib/app/utils/` is ALSO entirely missing — a newly identified gap,
-   larger than the `vpn_service` gap this milestone addresses (P0).**
+2. **`lib/app/utils/` was ALSO entirely missing (P0) — since reconstructed,
+   for real, one file at a time, from call-site usage; see below for what
+   remains.**
    While tracing every `package:karing/...` import to find what else was
    missing beyond `vpn_service`/`local_services`/`private` (already known
-   from the prior audit), this pass found that **`lib/app/utils/` — 57
+   from the prior audit), a later pass found that `lib/app/utils/` — 57
    files (`http_utils.dart`, `app_utils.dart`, `singbox_config_builder.dart`,
    `singbox_outbound.dart`, `singbox_dns.dart`, `did.dart`, `log.dart`,
    `sentry_utils.dart`, and 49 more), imported by 70 files across `lib/` —
-   does not exist in this repository either.** This was not caught by the
-   prior audit pass (which only checked `local_services` and `private`)
-   and is **not fixed by this milestone**: reconstructing 57 unknown files
-   from grep'd call sites is a separate, much larger effort than the VPN
-   architecture work requested here, and doing it by guessing would mean
-   fabricating app-wide utility code with no ground truth. Notably, the
-   missing tree's own file names (`singbox_config_builder.dart`,
+   did not exist in this repository either.
+
+   **Status as of this pass**: ~40 of those 57 files have been
+   reconstructed with real, working implementations, each grep'd against
+   every call site in `lib/` for its actual signature (not guessed) and
+   backed by dependencies already declared in `pubspec.yaml` (`dio`,
+   `archive`, `crypto`, `path_provider`, `webdav_client_plus`,
+   `android_package_manager`, `move_to_background`,
+   `flutter_local_notifications`, `sentry_flutter`, ...). `lib/app/private/`
+   (2 files: `sentry_utils_private.dart`, `app_url_utils_private.dart`) is
+   also reconstructed, deliberately blank — see those files' own doc
+   comments for why blank is the honest answer there, not a stub.
+
+   A deliberate minority of the 57 are Windows/UWP-only helpers
+   (`windows_version_helper.dart`, `windows_tun_fix_utils.dart`,
+   `uwp_utils.dart`) or optional integrations with no server-side
+   counterpart in this fork (`icloud_utils.dart`, `cloudflare_warp_api.dart`,
+   `cloudflare_warp_utils.dart`, `main_channel_utils.dart`'s
+   Android-command-channel piece): these report a clear "not available"
+   result rather than fabricating protocol/API behavior for a backend that
+   doesn't exist, following the same pattern `local_services/vpn_service.dart`
+   already established for desktop-only methods.
+
+   **Still not reconstructed** (blocked on §9.3 below, not attempted this
+   pass): `proxy_conf_utils.dart`, `auto_conf_utils.dart`,
+   `diversion_custom_utils.dart`, `clash_api.dart`,
+   `singbox_config_builder.dart`/`singbox_dns.dart`/`singbox_outbound.dart`/
+   `singbox_json_utils.dart`, `qrcode_utils.dart`, `backup_and_sync_utils.dart`.
+   These all take or return the app's own `ServerConfigGroupItem`/
+   `ProxyConfig`/`DiversionRulesGroup` types from §9.3, so reconstructing
+   them first and having to redo the work once those types exist would be
+   wasted effort — they come immediately after §9.3 in priority order.
+   Notably, the missing tree's own file names (`singbox_config_builder.dart`,
    `singbox_outbound.dart`, `singbox_dns.dart`, `singbox_json_utils.dart`)
    suggest upstream Karing's Dart layer *did* build sing-box config JSON
-   itself in some form — consistent with, and now superseded by,
-   `packages/vpn_core`'s `SingBoxConfigBuilder` (§4), but the other ~53
-   files (HTTP client, device/app utils, logging, backup/sync, QR codes,
-   ...) have no equivalent yet.
+   itself in some form — consistent with, and distinct from,
+   `packages/vpn_core`'s own `SingBoxConfigBuilder` (§4), which handles only
+   the VLESS+REALITY/Hysteria2 outbound leaf, not the full document.
 
-3. **`VPNService`, `ProxyConfig`, `ServerConfig` are NOT reconstructed
-   (P1).** These are the app's own large protocol/profile data-model
-   classes (grep found ~65, ~59, and ~7 call sites respectively across
-   `server_manager.dart`, `proxy_cluster.dart`, `home_screen.dart`, and
-   others) that the pre-existing UI code manipulates directly. Their real
-   shape (field names, types) is unknown without either the original
-   `vpn_service` source or a dedicated reverse-engineering/UI-integration
-   pass — explicitly out of scope here ("do not redesign the UI"). Wiring
-   them to `vpn_core` is real, substantial follow-up work, not a
-   mechanical rename.
+3. **`VPNService`, `ProxyConfig`, `ServerConfigGroupItem`,
+   `ServerDiversionGroupItem`, `DiversionRulesGroup`, `ProxyStrategy`, and
+   the `kOutboundTag*`/`SingboxOutboundType` constants are STILL NOT
+   reconstructed (P0 — the single largest remaining blocker).** A later
+   pass corrected an earlier assumption here: `ServerConfig` itself
+   *already exists* for real, in `server_manager.dart` (~2,900 lines,
+   present in this fork) — what's actually missing is narrower and more
+   concentrated than "the app's own large protocol/profile data-model
+   classes" implied. It's specifically the Dart facade of the deleted
+   `package:vpn_service` plugin (`vpn_service/state.dart`,
+   `vpn_service/vpn_service.dart`, `vpn_service/proxy_manager.dart`),
+   imported directly by only 17 files
+   (`grep -rn "import 'package:vpn_service" lib/`) but defining types used
+   ~100-150 times each across `server_manager.dart`, `proxy_cluster.dart`,
+   `setting_manager.dart`, `remote_config_manager.dart`, and the screens
+   that read their state (1,003 of the 1,898 `flutter analyze` errors
+   found this pass trace back to these undefined names — see the "Current
+   status" note below `## 2` for the live count).
+
+   Their real shape (field names, types) is knowable — every call site
+   that reads or writes one is real, present, un-obfuscated app code — but
+   extracting it means reading `server_manager.dart` end to end (not
+   grep-sampling it), since e.g. `ServerConfigGroupItem` alone has ~140
+   distinct call sites across `.fromJson()`/`.toJson()`/`.clone()`/
+   `.getByTag()` and a dozen fields (`enable`, `groupid`, `providerId`,
+   `servers: List<ProxyConfig>`, `traffic: SubscriptionTraffic?`, `type:
+   SubscriptionLinkType`, ...) whose types themselves need defining first.
+   This is real, substantial, single-threaded reverse-engineering work,
+   not a mechanical rename — doing it from fragments would mean guessing
+   field shapes with no ground truth, which the task this document exists
+   for explicitly rules out. Once these types exist, wiring `VPNService`'s
+   actual VPN-affecting methods (start/stop/status) to `vpn_core` is the
+   direct, already-designed mapping described in §§2-3 above; the bulk of
+   the remaining effort is the data model, not the `vpn_core` wiring.
 
 4. **`FlutterVpnService`'s desktop-only methods are stubs (P2).**
    `authorizeService`, `firewallAddPorts`, `getProcessIcon`/
@@ -337,13 +387,22 @@ tree compile. Specifically, in priority order:
    `packages/vpn_core/test/` automatically — see `docs/BUILDING.md`'s CI
    section (design only, per the prior audit's scope).
 
-**Bottom line**: `flutter pub get` will now resolve (the blocking private
-path dependency is gone, replaced by an in-repo package — requirement 1/13
-of this milestone). `flutter build apk --debug` will very likely **still
-fail** on a clean clone, because of finding #2 above (`lib/app/utils/`)
-and #3 (`VPNService`/`ProxyConfig`/`ServerConfig`) — neither of which is
-part of the VPN-service-layer architecture this milestone was scoped to
-fix. See `docs/BUILDING.md` for exactly what was and wasn't verified.
+**Bottom line, updated**: `flutter pub get` resolves cleanly (verified with
+a real Flutter 3.44.9 SDK, matching `docs/CI.md`'s pin — the blocking
+private path dependency is gone). A real `flutter analyze` run against a
+clean checkout found 1,898 errors, not the "flutter/dart not installed,
+untested" state of the original audit; a later pass brought that to 1,003
+by reconstructing ~40 of the 57 missing `lib/app/utils/` files (finding
+#2) and both `lib/app/private/` files, with real implementations backed by
+already-declared dependencies, not stubs. The remaining ~1,003 errors are
+now overwhelmingly concentrated in one place: finding #3
+(`VPNService`/`ProxyConfig`/`ServerConfigGroupItem`/
+`ServerDiversionGroupItem`/`DiversionRulesGroup` and friends, from the
+deleted `package:vpn_service` Dart facade) plus the handful of
+`lib/app/utils/` files that depend on those same types (listed under
+finding #2 above). `flutter build apk --debug` still fails on a clean
+clone until finding #3 is done. See `docs/BUILDING.md` for what was and
+wasn't verified, and finding #3 above for the concrete next-session scope.
 
 ## 10. Why `libbox.aar`/`Libbox.xcframework` aren't committed
 
