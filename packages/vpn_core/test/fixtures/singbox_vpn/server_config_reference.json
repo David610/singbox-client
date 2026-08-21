@@ -1,0 +1,40 @@
+{
+  "log": { "level": "warn", "timestamp": true },
+  "inbounds": [
+    {
+      "type": "vless",
+      "tag": "vless-reality-in",
+      "listen": "127.0.0.1",
+      "listen_port": 32002,
+      "users": [
+        { "name": "interop-test-user", "uuid": "9c7e12d1-64c3-46f2-9e21-d707f05c88d9", "flow": "xtls-rprx-vision" }
+      ],
+      "tls": {
+        "enabled": true,
+        "server_name": "localhost",
+        "reality": {
+          "enabled": true,
+          "handshake": { "server": "localhost", "server_port": 32001 },
+          "private_key": "6BCFEAfj1E78_XMA9Ue0gkg0td145QdwizDSJ_fjvVA",
+          "short_id": ["580686c710f58181"]
+        }
+      }
+    },
+    {
+      "type": "hysteria2",
+      "tag": "hysteria2-in",
+      "listen": "127.0.0.1",
+      "listen_port": 32003,
+      "users": [
+        { "name": "interop-test-user", "password": "test-h2-fake-password-000" }
+      ],
+      "tls": {
+        "enabled": true,
+        "certificate_path": "/tmp/singbox-interop/decoy.crt",
+        "key_path": "/tmp/singbox-interop/decoy.key"
+      },
+      "obfs": { "type": "salamander", "password": "test-salamander-fake-000" }
+    }
+  ],
+  "outbounds": [ { "type": "direct", "tag": "direct" } ]
+}

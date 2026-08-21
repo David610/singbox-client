@@ -1,0 +1,1 @@
+vless://9c7e12d1-64c3-46f2-9e21-d707f05c88d9@vpn.singboxvpn.test.invalid:8443?encryption=none&security=reality&sni=www.microsoft.com&fp=chrome&pbk=anIGqfcDa8ypMGtP6lcoc3Fu54p3gOWMl9LKvIjRx3w&sid=580686c710f58181&type=tcp#Reality%20%28EXPERIMENTAL%20Vision-off%29

@@ -1,0 +1,1 @@
+hysteria2://test-h2-fake-password-000@vpn.singboxvpn.test.invalid:8444?sni=vpn.singboxvpn.test.invalid&insecure=0#Hysteria2

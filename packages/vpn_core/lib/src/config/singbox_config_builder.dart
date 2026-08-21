@@ -166,7 +166,16 @@ class SingBoxConfigBuilder {
       server: parsed.host,
       serverPort: parsed.port,
       uuid: uuid,
-      flow: q['flow'] ?? 'xtls-rprx-vision',
+      // An absent `flow` parameter means "no flow", NOT "assume Vision" --
+      // see the "xtls-rprx-vision where supplied" compatibility target and
+      // singbox_vpn_compat_test.dart's `vision_off` case, traced against
+      // singbox-vpn's own `render_vless_reality_uri_vision_off` (which
+      // omits `flow` entirely on purpose, for a real per-user server-side
+      // opt-out -- see that function's doc comment). An earlier version of
+      // this parser defaulted a missing `flow` back to
+      // 'xtls-rprx-vision', which silently re-added Vision for exactly the
+      // profile designed to omit it.
+      flow: q['flow'] ?? '',
       sni: q['sni'] ?? parsed.host,
       publicKey: publicKey,
       shortId: q['sid'] ?? '',
@@ -258,5 +267,38 @@ class SingBoxConfigBuilder {
       'route': {'final': tag, 'auto_detect_interface': true},
     };
     return const JsonEncoder.withIndent('  ').convert(doc);
+  }
+
+  /// Parses a full sing-box client subscription document — the exact shape
+  /// `GET /sub/{token}` (default `format=singbox`) returns, e.g. from
+  /// `render_singbox_client_subscription_with_options` in singbox-vpn's
+  /// `crates/compat-config/src/render.rs` — and returns its `outbounds`
+  /// array as a list of maps, in document order. This is the entry point
+  /// for "subscription URL import": callers fetch the URL themselves
+  /// (a plain HTTPS GET, out of scope for this parser) and hand the
+  /// response body here.
+  static List<Map<String, Object?>> extractOutboundsFromSubscription(
+    String subscriptionJson,
+  ) {
+    final doc = jsonDecode(subscriptionJson) as Map<String, Object?>;
+    final outbounds = doc['outbounds'];
+    if (outbounds is! List) {
+      throw const SingBoxUriParseException(
+        'subscription document has no "outbounds" array',
+      );
+    }
+    return outbounds.cast<Map<String, Object?>>();
+  }
+
+  /// Finds the first outbound of a given `type` (e.g. "vless", "hysteria2")
+  /// in a parsed outbound list, or null if none is present.
+  static Map<String, Object?>? findOutboundByType(
+    List<Map<String, Object?>> outbounds,
+    String type,
+  ) {
+    for (final ob in outbounds) {
+      if (ob['type'] == type) return ob;
+    }
+    return null;
   }
 }
