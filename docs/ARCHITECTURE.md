@@ -286,36 +286,131 @@ Dart: VpnCore.start(config)
             [configJson crosses via NEVPNConnection's private options
              dictionary -- Apple's documented mechanism for exactly this,
              never a launch argument, never logged]
-  -> (new process) PacketTunnelProvider.startTunnel(options:)
+  -> (new process, the "PacketTunnel" Network Extension target)
+     PacketTunnelProvider.startTunnel(options:) async throws
        (ios/vpnCoreService/PacketTunnelProvider.swift)
-         -> LibboxCheckConfig(configJson)
-         -> LibboxNewBoxService(configJson, LibboxPlatformInterface(self))
-         -> service.start()
+         -> LibboxSetup(SetupOptions{basePath/workingPath/tempPath in the
+              group.com.nebula.karing app-group container, logMaxLines})
+         -> LibboxRedirectStderr(...), LibboxSetMemoryLimit(true)
+         -> LibboxNewCommandServer(platformInterface, platformInterface, &error)
+         -> commandServer.start()
+         -> commandServer.startOrReloadService(configJson, options: LibboxOverrideOptions())
+              -> (inside libbox) calls back into ExtensionPlatformInterface.openTun(_:ret0_:)
+                   -> builds NEPacketTunnelNetworkSettings/NEIPv4Settings/
+                      NEIPv6Settings/NEDNSSettings/NEProxySettings from the
+                      TunOptions the parsed config produced
+                   -> tunnel.setTunnelNetworkSettings(settings) -- this is
+                      what actually programs the OS's routing table/DNS; it
+                      only returns once NetworkExtension has done so
+                   -> reads the raw TUN fd via
+                      packetFlow.value(forKeyPath: "socket.fileDescriptor")
+                      (falling back to LibboxGetTunnelFileDescriptor()) and
+                      returns it to libbox, which owns the packet
+                      read/write loop against that fd from there --
+                      NEPacketTunnelFlow's own read/write API is NOT used
+                      directly; libbox reads/writes the fd itself, matching
+                      upstream's own architecture (see below)
 ```
 
-`LibboxPlatformInterface` implements the Go-side `PlatformInterface`
-contract (`experimental/libbox/platform.go` in the pinned sing-box source —
-`OpenTun`, `UseProcFS`, `UsePlatformAutoDetectInterfaceControl`,
-`FindConnectionOwner`, `GetInterfaces`, `UnderNetworkExtension`,
-`ReadWIFIState`, `SystemCertificates`, `ClearDNSCache`,
-`SendNotification`, ...). `openTun` calls
-`NEPacketTunnelProvider.setTunnelNetworkSettings(_:completionHandler:)` —
-the documented, App Store-safe way to establish the tunnel interface on
-iOS (there is no raw fd handoff like Android's `ParcelFileDescriptor`;
-NetworkExtension instead exposes `packetFlow` for reading/writing packets).
+`startTunnel` only returns without throwing once `startOrReloadService`
+has returned successfully, which itself only returns once `openTun` --
+including the `setTunnelNetworkSettings` call above -- has completed. A
+start failure at any step (bad config, setup, command-server creation,
+service start, tunnel-settings rejection, missing fd) throws
+`ExtensionStartupError`/`NSError` out of `startTunnel`, which
+`NEPacketTunnelProvider` surfaces as a failed connection attempt -- there
+is no code path that reaches "returned successfully" without the tunnel
+being genuinely usable, and no path that can silently report `.connected`
+on failure. `stopTunnel(with:)` calls `commandServer.closeService()`,
+waits briefly for in-flight log writes to flush, then `commandServer.close()`
+and nils the reference out, so a second `startTunnel` after a `stopTunnel`
+starts from a clean object graph (Xcode/device tests cannot be run here to
+confirm this holds across N real connect/disconnect cycles -- see the
+caveat below).
 
-**Important caveat, stated plainly**: this repository has no macOS/Xcode
-host, so `Libbox.xcframework` was never actually built or linked in this
-environment, and `LibboxPlatformInterface`'s exact Swift method names/types
-are gomobile's *generated* binding of the Go interface above — the Go
-interface itself was read directly from the pinned source (real), but the
-precise Swift spelling gomobile emits should be checked against the
-generated header the first time `Libbox.xcframework` is actually built
-(`packages/vpn_core/native/singbox-go/build_ios.sh`). See
-`docs/BUILDING.md` "What could not be verified in this environment".
+`ExtensionPlatformInterface` (`ios/vpnCoreService/PlatformInterface.swift`)
+implements both Go-side interfaces the pinned core calls back into:
+`PlatformInterface` (`experimental/libbox/platform.go` -- `OpenTun`,
+`UseProcFS`, `UsePlatformAutoDetectInterfaceControl`,
+`FindConnectionOwner`, `StartDefaultInterfaceMonitor`/
+`CloseDefaultInterfaceMonitor`/`GetInterfaces` via `NWPathMonitor`,
+`UnderNetworkExtension`, `IncludeAllNetworks`, `ReadWIFIState` via
+`NEHotspotNetwork.fetchCurrent()`, `SystemCertificates`,
+`ClearDNSCache`, `SendNotification`, `LocalDNSTransport`) and
+`CommandServerHandler` (`experimental/libbox/command_server.go` --
+`ServiceStop`/`ServiceReload`, `GetSystemProxyStatus`/
+`SetSystemProxyEnabled`, `WriteDebugMessage`).
 
-**Not yet wired**: the `NEPacketTunnelFlow` read/write loop that actually
-moves packets between the OS and libbox once `openTun` returns — see §9.
+**How this was verified without a macOS/Xcode host (stated plainly).**
+This repository has no macOS/Xcode/iPhone in this environment: none of
+`ios/vpnCoreService/*.swift` was ever compiled, `Libbox.xcframework` was
+never built or linked, and no gomobile-generated header was inspected
+directly. Instead, every libbox call above and the exact Swift method
+signatures in `PlatformInterface.swift` were cross-checked against a real,
+production Apple client for this exact same core: `SagerNet/sing-box-for-apple`
+at its `main` branch, whose `Library.xcodeproj` `MARKETING_VERSION` is
+`1.13.19` -- the exact version this project pins (confirmed by cloning that
+branch directly and reading `Library/Network/ExtensionProvider.swift` and
+`Library/Network/ExtensionPlatformInterface.swift` in full, not
+sampling them). Its `stable` branch was checked too and rejected as a
+reference: it pins `1.13.0-alpha.21` and calls an older `LibboxNewService`/
+`LibboxBoxService` constructor pair that does not exist in the pinned
+v1.13.19 Go source (confirmed by `grep`ing `experimental/libbox/*.go` in
+the resolved `github.com/sagernet/sing-box@v1.13.19` module for `^func New`
+and finding no such function -- only `NewCommandServer`, the one this file
+calls). The Go interface declarations themselves (`PlatformInterface`,
+`CommandServerHandler`, `TunOptions`, `SetupOptions`, `OverrideOptions`,
+`SystemProxyStatus`, `StringIterator`, `NetworkInterfaceIterator`) were
+also read directly from that resolved module, not inferred from the Swift
+reference alone -- so every method this file calls or implements has two
+independent confirmations (the real Go interface it must satisfy, and a
+real, matching-version Swift binding proving gomobile's exact spelling of
+it), except for the handful gomobile emits from Go struct field getters
+(e.g. `LibboxNetworkInterface.type`), which come from the Swift reference
+only since the pinned Go struct itself doesn't dictate binding casing.
+Trimmed relative to that reference on purpose, not by omission: no macOS/
+tvOS/system-extension branches (this app is iOS-only), no
+`RootHelperClient`/XPC path, no `ExtensionStartOptions` persistence layer
+(`VpnCorePlugin.swift` always passes `configJson` explicitly on every
+`startVPNTunnel(options:)` call, so there is nothing to persist against),
+no WidgetKit/ControlCenter integration (this app has no widget), no
+per-profile `OverridePreferences` UI (the constants used reproduce
+upstream's own defaults for an unconfigured profile). `systemCertificates()`
+and `localDNSTransport()` return `nil`, matching the verified reference's
+own choice on Apple platforms, not a cut corner.
+
+**What genuinely could not be verified here, at all**: whether this Swift
+actually compiles under Xcode 26/Swift 5, whether the hand-edited
+`ios/Runner.xcodeproj/project.pbxproj` (registering the "PacketTunnel"
+Network Extension target, its Info.plist/entitlements, and linking
+`Libbox.xcframework` into it -- see below) opens and builds correctly in
+Xcode, and all of the physical-device behavior (VLESS TCP, Hysteria2 UDP,
+DNS, IPv4/IPv6, sleep/wake, Wi-Fi/cellular transition, repeated
+connect/disconnect). None of that is possible without macOS, Xcode, and a
+signed physical iPhone, none of which exist in this environment. See
+`docs/BUILDING.md` "What could not be verified in this environment" for
+the exact commands a developer with that hardware needs to run first.
+
+**The Xcode project target.** `ios/Runner.xcodeproj/project.pbxproj` now
+registers a `PacketTunnel` `com.apple.product-type.app-extension` target
+(bundle id `<Runner bundle id>.PacketTunnel`, i.e.
+`com.nebula.karing.PacketTunnel` -- matching what
+`VpnCorePlugin.swift`'s `tunnelBundleIdentifierSuffix` already expects),
+replacing the prior `karingService` target that inherited 100% of its
+behavior from a `LibVpnCore.framework` product built from
+`../bind/apple/LibVpnCore` -- a path that does not exist anywhere in this
+repository or its git history; that target, and the sibling `LibVpnCore`
+framework target that built it from the equally nonexistent
+`../bind/apple/Libbox.xcframework`, were both dead configuration left over
+from Karing's own private, never-checked-in build setup, and have been
+removed rather than repaired. `Libbox.xcframework` is now referenced from
+its real, buildable location: `packages/vpn_core/ios/Frameworks/Libbox.xcframework`,
+the exact output path of `packages/vpn_core/native/singbox-go/build_ios.sh`.
+It is linked into the `PacketTunnel` target's Frameworks build phase only
+-- not into `Runner`, and not vendored via `vpn_core.podspec` either (see
+that file's comments): `VpnCorePlugin.swift` only talks to
+`NETunnelProviderManager`, a public framework, so the host app has no
+libbox dependency to link.
 
 ## 8. Security implications
 
@@ -361,16 +456,21 @@ in-repo `vpn_core` package with a correct `VpnService`/
 deliver a fully working tunnel, and does **not** yet make the whole `lib/`
 tree compile. Specifically, in priority order:
 
-1. **Packet-loop wiring (P0 for a working tunnel) — DONE for Android,
-   STILL OPEN for iOS.** Android: `SingBoxVpnService` now implements
-   `PlatformInterface` directly and drives the real `CommandServer.startOrReloadService`
-   lifecycle — see §6 for the full, real call chain and its honest
-   verification caveat (no device/NDK in this environment to actually
-   build `libbox.aar` and run it). iOS: `LibboxPlatformInterface.openTun`
-   still only establishes the OS-level tunnel settings and doesn't yet
-   run the `NEPacketTunnelFlow` read/write loop — this remains the
-   direct next implementation task for iOS specifically. See
-   `docs/BUILDING.md` "Next implementation task".
+1. **Packet-loop wiring (P0 for a working tunnel) — DONE for both Android
+   and iOS, unverified end-to-end on real hardware for either.** Android:
+   `SingBoxVpnService` implements `PlatformInterface` directly and drives
+   the real `CommandServer.startOrReloadService` lifecycle — see §6 for
+   the full, real call chain and its honest verification caveat (no
+   device/NDK in this environment to actually build `libbox.aar` and run
+   it). iOS: `ExtensionPlatformInterface.openTun` establishes the OS-level
+   tunnel settings and hands libbox the real TUN fd (via
+   `packetFlow.value(forKeyPath: "socket.fileDescriptor")`/
+   `LibboxGetTunnelFileDescriptor()`); libbox itself owns the packet
+   read/write loop against that fd from there, matching the verified
+   upstream Apple reference's own architecture — see §7 for the full call
+   chain and its honest verification caveat (no macOS/Xcode/iPhone in this
+   environment to actually build `Libbox.xcframework`, compile the
+   extension, or run it).
 
 2. **`lib/app/utils/` was ALSO entirely missing (P0) — since reconstructed,
    for real, one file at a time, from call-site usage; see below for what
@@ -463,8 +563,18 @@ tree compile. Specifically, in priority order:
    defaults in `lib/app/local_services/vpn_service.dart` — out of scope for
    the Android/iOS target this task specified.
 
-5. **iOS Swift binding names are unverified against a real build (P2)** —
-   see §7's caveat.
+5. **iOS is entirely unverified against a real Xcode build or device (P1)**
+   — no macOS/Xcode/iPhone exists in this environment, so
+   `ios/vpnCoreService/*.swift` was never compiled, `Libbox.xcframework`
+   was never built, `ios/Runner.xcodeproj` was never opened in Xcode
+   (the "PacketTunnel" extension target registration in `project.pbxproj`
+   was hand-edited, not added through Xcode's UI), and none of
+   `xcodebuild Runner`/`xcodebuild PacketTunnel`/a signed device
+   install/VLESS/Hysteria2/DNS/IPv4+IPv6/sleep-wake/Wi-Fi-cellular/
+   repeated-connect-disconnect testing was run. See §7's verification
+   section for exactly what was and wasn't cross-checked in place of a
+   real build, and `docs/BUILDING.md` for the commands a developer with
+   that hardware needs to run first.
 
 6. **No CI yet** to enforce the pin-mismatch check or run
    `packages/vpn_core/test/` automatically — see `docs/BUILDING.md`'s CI

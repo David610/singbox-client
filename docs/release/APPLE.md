@@ -19,10 +19,10 @@ guessed here. Items already verifiable from the repository are marked
 ## Network Extension capability
 
 - [x] **Already declared** in this repository's entitlements (verified by reading the files directly, not assumed):
-  - `ios/Runner/Runner.entitlements`: `com.apple.developer.networking.networkextension` = `["packet-tunnel-provider"]`
-  - `ios/karingService/karingService.entitlements` (the OLD, currently-unbuildable extension target — see `docs/FORK_ARCHITECTURE_AUDIT.md` §5): same entitlement
+  - `ios/Runner/Runner.entitlements`: `com.apple.developer.networking.networkextension` = `["packet-tunnel-provider"]`, `com.apple.security.application-groups` = `["group.com.nebula.karing"]`
+  - `ios/vpnCoreService/PacketTunnel.entitlements` (the `PacketTunnel` Network Extension target registered in `ios/Runner.xcodeproj/project.pbxproj` — see `docs/ARCHITECTURE.md` §7 and `docs/BUILDING.md` "iOS"): same `packet-tunnel-provider` entitlement and the same `group.com.nebula.karing` App Group as `Runner.entitlements` above, so the app and extension share state via the same container. This replaces the OLD, unbuildable `ios/karingService` extension target (deleted — see `docs/FORK_ARCHITECTURE_AUDIT.md` §5), not merely added alongside it.
 - [ ] **The Network Extension capability itself must still be requested from Apple** for your specific bundle ID / Team ID via the Apple Developer portal (Certificates, Identifiers & Profiles → your App ID → capabilities). This is a per-account, per-app-ID grant Apple reviews — it is not automatically available just because the entitlement is present in a project file. `TODO(you):` request it, record the approval date here.
-- [ ] Once `ios/vpnCoreService/PacketTunnelProvider.swift` is wired into a real Xcode target (`docs/BUILDING.md` "iOS", `docs/ARCHITECTURE.md` §7), create `ios/vpnCoreService/vpnCoreService.entitlements` mirroring the same `packet-tunnel-provider` entitlement and App Group as the files above — don't invent a new App Group ID; reuse `group.com.nebula.karing` (or its post-rebrand replacement — see `docs/FORK_ARCHITECTURE_AUDIT.md` §10) so the app and extension can share state via the same container.
+- [ ] **This target registration has never been opened in Xcode or built** (no macOS/Xcode available in the environment that added it — see `docs/ARCHITECTURE.md` §7's verification account). Before relying on it for a release, open `Runner.xcworkspace` in Xcode, confirm the `PacketTunnel` target appears correctly and builds, and regenerate provisioning profiles for both targets once the capability above is approved.
 
 ## Packet Tunnel Provider entitlement
 

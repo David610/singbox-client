@@ -99,23 +99,30 @@ cd packages/vpn_core/native/singbox-go
 # -> writes packages/vpn_core/ios/Frameworks/Libbox.xcframework
 ```
 
-Then, in Xcode:
+Then:
 
-1. Uncomment `s.vendored_frameworks` in `packages/vpn_core/ios/vpn_core.podspec`.
-2. Add a Network Extension target named to match
-   `VpnCorePlugin.swift`'s `tunnelBundleIdentifierSuffix` (`.PacketTunnel`
-   by default — either rename the target's bundle id to match, or edit the
-   suffix in `packages/vpn_core/ios/Classes/VpnCorePlugin.swift`), with
-   `ios/vpnCoreService/PacketTunnelProvider.swift` as its source and
-   `Libbox.xcframework` linked to it (not to the main `Runner` target).
-3. `cd ios && pod install`
-4. `flutter build ios --debug --no-codesign` (or open `Runner.xcworkspace`
-   and build/run from Xcode for a signed build on a device).
+1. `cd ios && pod install` (`Libbox.xcframework` is deliberately **not**
+   vendored via `vpn_core.podspec` — see that file's comments. It is
+   already wired directly into the `PacketTunnel` Network Extension
+   target's Frameworks build phase in `Runner.xcodeproj/project.pbxproj`,
+   which now expects `Libbox.xcframework` to exist at the path
+   `build_ios.sh` writes to before that target will build.)
+2. `flutter build ios --debug --no-codesign` (or open `Runner.xcworkspace`
+   in Xcode and build/run from there for a signed build on a device).
 
-This mirrors how Karing's own `ios/karingService` Network Extension target
-was structured (see `docs/FORK_ARCHITECTURE_AUDIT.md` §5), except
-`PacketTunnelProvider.swift` now contains real tunnel logic instead of an
-empty subclass of a missing framework.
+The `PacketTunnel` Network Extension target (bundle id
+`com.nebula.karing.PacketTunnel`, matching `VpnCorePlugin.swift`'s
+`tunnelBundleIdentifierSuffix`) is already registered in
+`ios/Runner.xcodeproj/project.pbxproj`, with `ios/vpnCoreService/*.swift`
+as its sources and `Libbox.xcframework` linked to it only (not to the main
+`Runner` target). It replaces Karing's own `ios/karingService` target
+(see `docs/FORK_ARCHITECTURE_AUDIT.md` §5), which has been removed rather
+than repaired — it depended on a `LibVpnCore.framework` built from a
+`../bind/apple/` path that does not exist anywhere in this repository.
+**This target registration was hand-edited into `project.pbxproj` directly
+(text editing, not through Xcode's UI) and has never been opened in Xcode
+or built** — see "What could not be verified in this environment" below
+for exactly what that means and what to check first.
 
 ## What could not be verified in this environment
 
@@ -157,16 +164,38 @@ Stated plainly, per this task's own instructions ("never fake a build"):
   The state-machine logic that does NOT depend on Android/libbox
   (`VpnLifecycleState.kt`) IS compiler- and test-verified: see "What WAS
   actually verified" below.
-- **No macOS/Xcode.** `build_ios.sh`,
-  `packages/vpn_core/ios/Classes/VpnCorePlugin.swift`, and
-  `ios/vpnCoreService/PacketTunnelProvider.swift` were not compiled. In
-  particular, `LibboxPlatformInterface`'s exact method names are gomobile's
-  *generated* Swift binding of a Go interface that **was** read directly
-  from the pinned sing-box source (real, verified) — but gomobile's exact
-  naming convention for that generated code was not independently
-  confirmed against a built `Libbox.xcframework` header, because none was
-  built. Treat that file as "structurally correct, naming unverified" until
-  a real `build_ios.sh` run + Xcode build confirms it.
+- **No macOS/Xcode/iPhone.** `build_ios.sh` was not run, `Libbox.xcframework`
+  was not built, none of `packages/vpn_core/ios/Classes/VpnCorePlugin.swift`
+  or `ios/vpnCoreService/{PacketTunnelProvider,PlatformInterface,RunBlocking}.swift`
+  were compiled, `ios/Runner.xcodeproj` was never opened in Xcode (the
+  `PacketTunnel` Network Extension target registered in `project.pbxproj`
+  was added by hand-editing that file's text directly, not through Xcode's
+  "New Target" UI — a materially higher-risk way to register a target,
+  since nothing here re-derived or validated the project graph the way
+  Xcode's own target wizard would), and `xcodebuild`/a signed device
+  install/any on-device test (VLESS TCP, Hysteria2 UDP, DNS, IPv4/IPv6,
+  sleep/wake, Wi-Fi/cellular transition, repeated connect/disconnect) was
+  not run. What WAS done to reduce that risk, in place of an actual build:
+  every Go-side interface (`PlatformInterface`, `CommandServerHandler`,
+  `TunOptions`, `SetupOptions`, `OverrideOptions`) that
+  `PlatformInterface.swift` implements or calls was read directly from the
+  pinned `github.com/sagernet/sing-box@v1.13.19` module source (real, not
+  guessed), and the exact Swift method signatures, libbox call sequence,
+  and TUN-fd retrieval mechanism (`packetFlow.value(forKeyPath:
+  "socket.fileDescriptor")` falling back to `LibboxGetTunnelFileDescriptor()`)
+  were cross-checked against `SagerNet/sing-box-for-apple`'s own real,
+  production Swift source at its `main` branch — the one branch of that
+  repo whose `MARKETING_VERSION` (`1.13.19`) exactly matches this
+  project's pin (its `stable` branch, pinned to `1.13.0-alpha.21`, was
+  fetched too and rejected: it calls a `LibboxNewService`/`LibboxBoxService`
+  constructor pair that does not exist in the pinned v1.13.19 Go source,
+  confirmed by grepping that module for `^func New` and finding only
+  `NewCommandServer`). See `docs/ARCHITECTURE.md` §7 for the full
+  verification account and exactly what was trimmed relative to that
+  reference and why. Treat all of it as "cross-checked against real,
+  matching-version source on both sides of the binding, never compiled or
+  run" until an actual `build_ios.sh` run, Xcode build, and device test
+  confirm it.
 - **What WAS actually verified, with commands run and shown in this
   session:**
   - `github.com/sagernet/sing-box@v1.13.19` resolves via the public Go
@@ -231,16 +260,25 @@ succeeding on a clean clone today, neither of which this milestone's scope
 
 The single most valuable next step, in order:
 
-1. **Packet-loop wiring — DONE for Android, still open for iOS**
-   (`docs/ARCHITECTURE.md` §9 item 1). `SingBoxVpnService` now implements
-   `PlatformInterface` directly and drives a real `CommandServer.startOrReloadService`
-   lifecycle (see `docs/ARCHITECTURE.md` §6) — the concrete remaining
-   step for Android is building `libbox.aar` (this document, above) and
-   running `SingBoxVpnServiceInstrumentedTest` plus a manual device
-   acceptance pass against a real `singbox-vpn` server, neither possible
-   in this environment (no NDK, no device). iOS: connect
-   `LibboxPlatformInterface.openTun`'s settings through to a real
-   `NEPacketTunnelFlow` read/write loop — this remains unstarted.
+1. **Packet-loop wiring — DONE for both Android and iOS, unverified on
+   real hardware for either** (`docs/ARCHITECTURE.md` §9 item 1).
+   Android: `SingBoxVpnService` implements `PlatformInterface` directly
+   and drives a real `CommandServer.startOrReloadService` lifecycle (see
+   `docs/ARCHITECTURE.md` §6) — the concrete remaining step is building
+   `libbox.aar` (this document, above) and running
+   `SingBoxVpnServiceInstrumentedTest` plus a manual device acceptance
+   pass against a real `singbox-vpn` server, neither possible in this
+   environment (no NDK, no device). iOS: `ExtensionPlatformInterface.openTun`
+   applies the tunnel network settings and hands libbox the real TUN fd,
+   which libbox then owns for its own packet read/write loop (see
+   `docs/ARCHITECTURE.md` §7) — the concrete remaining step is building
+   `Libbox.xcframework` (this document, above), opening
+   `Runner.xcworkspace` in Xcode to confirm the hand-edited
+   `PacketTunnel` target actually builds, and the full physical-device
+   test list this milestone specified (VLESS TCP, Hysteria2 UDP, DNS,
+   IPv4/IPv6, sleep/wake, Wi-Fi/cellular transition, 10 connect/disconnect
+   cycles), none possible in this environment (no macOS, no Xcode, no
+   iPhone).
 2. Only after that: begin reconstructing `lib/app/utils/` and
    `VPNService`/`ProxyConfig`/`ServerConfig`, file by file, starting with
    whichever the fewest other files depend on — that work should get its
