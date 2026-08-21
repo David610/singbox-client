@@ -140,7 +140,13 @@ class SingBoxConfigBuilder {
     if (parsed == null || parsed.scheme != 'vless') {
       throw const SingBoxUriParseException('not a vless:// URI');
     }
-    final uuid = parsed.userInfo;
+    // Uri.userInfo returns the RAW, still-percent-encoded component --
+    // Uri does not auto-decode it the way it does queryParameters. Must
+    // decode explicitly or a credential containing a reserved character
+    // (e.g. '@', found by a real hysteria2:// password in this parser's
+    // sibling case below) comes out wrong. See
+    // singbox_config_builder_test.dart's percent-encoded-password case.
+    final uuid = Uri.decodeComponent(parsed.userInfo);
     if (uuid.isEmpty) {
       throw const SingBoxUriParseException('missing uuid');
     }
@@ -196,7 +202,12 @@ class SingBoxConfigBuilder {
     if (parsed == null || parsed.scheme != 'hysteria2') {
       throw const SingBoxUriParseException('not a hysteria2:// or hy2:// URI');
     }
-    final password = parsed.userInfo;
+    // Same decoding note as parseVlessRealityUri's uuid above -- Uri
+    // does not auto-decode userInfo. Found by a real CI run: a password
+    // containing '@' (percent-encoded to '%40' in the URI, as any real
+    // password generator would produce) was coming out of this parser
+    // still percent-encoded, silently wrong rather than throwing.
+    final password = Uri.decodeComponent(parsed.userInfo);
     if (password.isEmpty) {
       throw const SingBoxUriParseException('missing password');
     }
