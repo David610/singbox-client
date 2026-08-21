@@ -44,6 +44,21 @@ Future<String?> findSingBoxBinary() async {
   return null;
 }
 
+/// Matching singbox-vpn's own `VPN1_REQUIRE_REAL_INTEROP=1` precedent
+/// (see docs/SINGBOX_VPN_COMPATIBILITY.md): when
+/// `VPN_CORE_REQUIRE_REAL_INTEROP=1` is set (as CI does -- see
+/// .github/workflows/singbox-vpn-compat.yml), a missing sing-box binary
+/// or openssl is a hard failure, not a silent skip. Call this from each
+/// interop test file's `setUpAll` after resolving availability.
+void requireRealInteropIfDemanded({required bool available, required String what}) {
+  if (!available && Platform.environment['VPN_CORE_REQUIRE_REAL_INTEROP'] == '1') {
+    throw StateError(
+      'VPN_CORE_REQUIRE_REAL_INTEROP=1 but $what is not available -- '
+      'refusing to silently skip real protocol interop tests.',
+    );
+  }
+}
+
 bool opensslAvailable = false;
 
 Future<bool> findOpenssl() async {

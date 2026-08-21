@@ -18,6 +18,9 @@
 // singbox_config_builder_test.dart's "omits obfs..."/redaction tests and
 // docs/ARCHITECTURE.md's security section. Do not read this test's
 // `insecure: true` as vpn_core weakening TLS validation by default.
+@Tags(['interop'])
+library;
+
 import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
@@ -39,6 +42,8 @@ void main() {
   setUpAll(() async {
     singBoxBin = await findSingBoxBinary();
     haveOpenssl = await findOpenssl();
+    requireRealInteropIfDemanded(available: singBoxBin != null, what: 'sing-box binary');
+    requireRealInteropIfDemanded(available: haveOpenssl, what: 'openssl');
     workDir = await Directory.systemTemp.createTemp('vpn_core_hysteria2_interop_');
   });
 

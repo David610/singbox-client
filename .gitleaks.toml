@@ -1,0 +1,45 @@
+# gitleaks configuration for this repository.
+#
+# Extends gitleaks' default rule set (no [[rules]] overrides here) and
+# adds a narrow, explicitly-justified allowlist for known false positives
+# -- every entry below is a documented, non-secret value, not a blanket
+# suppression. See docs/CI.md "Secret scanning" for how this is run.
+#
+# Do NOT add an entry here to silence a real finding. If gitleaks flags
+# something and you are not certain it is one of the cases below, treat it
+# as a real secret: rotate it, remove it from history, and only then
+# consider whether it needs an allowlist entry.
+
+title = "singbox-client gitleaks config"
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Known false positives: documentation examples and this project's own fake/test-only fixtures"
+regexTarget = "match"
+paths = [
+  # Upstream Karing's own example/documentation config -- illustrative
+  # sample values (a Clash config sample with placeholder WireGuard/
+  # shadowsocks credentials), shipped publicly with Karing already, not
+  # this project's secrets and not a live deployment.
+  '''README_examples/clash/config\.yaml''',
+
+  # tvOS default sing-box clash-api config bundled with the app --
+  # "secret" here is a generic default control-API token for a locally
+  # bound API server (external_controller: 0.0.0.0:3057 in this same
+  # file), not a VPN credential and not a value that grants remote access
+  # to anything by itself.
+  '''tvos/Runner/service_core\.json''',
+
+  # packages/vpn_core/test/fixtures/singbox_vpn/ and
+  # packages/vpn_core/test/interop/: every credential-shaped value here
+  # is a fake value generated fresh in this project's own development
+  # session for parser/protocol testing (never a real subscription, never
+  # a value from a live deployment) -- see
+  # packages/vpn_core/test/fixtures/singbox_vpn/README.md and
+  # packages/vpn_core/test/interop/README.md for the full, auditable
+  # provenance of every one of them.
+  '''packages/vpn_core/test/fixtures/singbox_vpn/.*''',
+  '''packages/vpn_core/test/interop/.*_test\.dart''',
+]

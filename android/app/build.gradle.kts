@@ -110,8 +110,23 @@ configurations.configureEach {
     )
 }
 
+// This file is private-tree signing material (see
+// docs/FORK_ARCHITECTURE_AUDIT.md §10) and is absent on any machine that
+// hasn't checked out KaringX's private_for_build tree -- which includes
+// every CI runner and every contributor to this fork. Loading it
+// unconditionally used to crash Gradle *configuration* (not just a
+// release/profile build) for anyone without that tree, which meant no
+// Gradle invocation of any kind -- not even `assembleDebug` -- could ever
+// succeed here. Guarded so `authToken` is simply empty (Sentry upload is a
+// no-op without one) when the file is absent; unchanged for anyone who
+// does have the private tree.
 val sentryKeystore = rootProject.file("../../private_for_build/karing/karing/android/sign/sentry.properties")
-val sentryProp = Properties().apply { sentryKeystore.inputStream().use(this::load) }
+val sentryProp =
+        Properties().apply {
+            if (sentryKeystore.exists()) {
+                sentryKeystore.inputStream().use(this::load)
+            }
+        }
 ///
 // import io.sentry.android.gradle.extensions.InstrumentationFeature
 

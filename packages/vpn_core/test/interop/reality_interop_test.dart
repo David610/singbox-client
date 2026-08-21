@@ -19,6 +19,9 @@
 // set SING_BOX_BIN to a pinned v1.13.19 binary to run this for real; see
 // packages/vpn_core/UPSTREAM_VERSION.md for how one was built and verified
 // in this project's own development session.
+@Tags(['interop'])
+library;
+
 import 'dart:convert';
 import 'dart:io';
 
@@ -41,6 +44,8 @@ void main() {
   setUpAll(() async {
     singBoxBin = await findSingBoxBinary();
     haveOpenssl = await findOpenssl();
+    requireRealInteropIfDemanded(available: singBoxBin != null, what: 'sing-box binary');
+    requireRealInteropIfDemanded(available: haveOpenssl, what: 'openssl');
     workDir = await Directory.systemTemp.createTemp('vpn_core_reality_interop_');
   });
 
