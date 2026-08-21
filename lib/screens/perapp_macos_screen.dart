@@ -16,7 +16,7 @@ import 'package:karing/screens/theme_define.dart';
 import 'package:karing/screens/widgets/framework.dart';
 import 'package:karing/screens/widgets/sheet.dart';
 import 'package:karing/screens/widgets/text_field.dart';
-import 'package:vpn_service/vpn_service.dart';
+import 'package:karing/app/local_services/vpn_service.dart';
 
 class PerAppMacosScreen extends LasyRenderingStatefulWidget {
   static RouteSettings routSettings() {

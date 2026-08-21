@@ -7,13 +7,16 @@ import 'package:url_launcher/url_launcher.dart';
 class UrlLauncherUtils {
   UrlLauncherUtils._();
 
-  static Future<ReturnResultError?> loadUrl(String url) async {
+  static Future<ReturnResultError?> loadUrl(
+    String url, {
+    LaunchMode mode = LaunchMode.externalApplication,
+  }) async {
     final uri = Uri.tryParse(url);
     if (uri == null) {
       return ReturnResultError('invalid url: $url', report: false);
     }
     try {
-      final ok = await launchUrl(uri, mode: LaunchMode.externalApplication);
+      final ok = await launchUrl(uri, mode: mode);
       if (!ok) {
         return ReturnResultError('failed to launch: $url', report: false);
       }
@@ -38,8 +41,14 @@ class UrlLauncherUtils {
     return uri.replace(queryParameters: params).toString();
   }
 
-  static Future<String> reorganizationUrlWithAnchor(String url) async {
-    return url;
+  static Future<String> reorganizationUrlWithAnchor(
+    String url, {
+    String? anchor,
+  }) async {
+    if (anchor == null || anchor.isEmpty) return url;
+    final uri = Uri.tryParse(url);
+    if (uri == null) return url;
+    return uri.replace(fragment: anchor).toString();
   }
 
   static Future<void> closeWebview() async {}

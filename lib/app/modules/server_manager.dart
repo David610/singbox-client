@@ -1,5 +1,11 @@
 // ignore_for_file: unused_catch_stack, empty_catches
 
+// Re-exported so every one of this file's many consumers (which
+// historically got ServerConfigGroupItem/ProxyConfig/etc. transitively via
+// `package:vpn_service/state.dart`, imported alongside this file) keeps
+// working without needing its own explicit import of the replacement.
+export 'package:karing/app/modules/vpn_service_state.dart';
+
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
@@ -16,8 +22,10 @@ import 'package:karing/app/utils/auto_conf_utils.dart';
 import 'package:karing/app/utils/backup_and_sync_utils.dart';
 import 'package:karing/app/utils/clash_api.dart';
 import 'package:karing/app/utils/convert_utils.dart';
+import 'package:karing/app/utils/did.dart';
 
 import 'package:karing/app/utils/file_utils.dart';
+import 'package:karing/app/utils/file_saver.dart';
 import 'package:karing/app/utils/http_utils.dart';
 import 'package:karing/app/utils/log.dart';
 import 'package:karing/app/utils/path_utils.dart';
@@ -33,7 +41,7 @@ import 'package:karing/i18n/strings.g.dart';
 import 'package:path/path.dart' as path;
 import 'package:tuple/tuple.dart';
 import 'package:uuid/uuid.dart';
-import 'package:vpn_service/state.dart';
+import 'package:karing/app/modules/vpn_service_state.dart';
 
 const int kRemarkMaxLength = 32;
 
@@ -1588,11 +1596,11 @@ class ServerManager {
   static void updateByDelay(String delay, ProxyConfig config) {
     config.latency = delay;
     if (config.raw != null) {
-      config.raw["groupid"] = config.groupid;
-      config.raw["latency"] = config.latency;
-      config.raw["attach"] = config.attach;
-      config.raw["outlet_ip"] = config.outletip;
-      config.raw["outlet_region"] = config.outletregion;
+      config.raw!["groupid"] = config.groupid;
+      config.raw!["latency"] = config.latency;
+      config.raw!["attach"] = config.attach;
+      config.raw!["outlet_ip"] = config.outletip;
+      config.raw!["outlet_region"] = config.outletregion;
     }
   }
 
@@ -1611,11 +1619,11 @@ class ServerManager {
     }
 
     if (config.raw != null) {
-      config.raw["groupid"] = config.groupid;
-      config.raw["latency"] = config.latency;
-      config.raw["attach"] = config.attach;
-      config.raw["outlet_ip"] = config.outletip;
-      config.raw["outlet_region"] = config.outletregion;
+      config.raw!["groupid"] = config.groupid;
+      config.raw!["latency"] = config.latency;
+      config.raw!["attach"] = config.attach;
+      config.raw!["outlet_ip"] = config.outletip;
+      config.raw!["outlet_region"] = config.outletregion;
     }
   }
 
@@ -2478,12 +2486,13 @@ class ServerManager {
         : item.userAgentCompatibles.join(";");
     late ReturnResult<Tuple2<int, HttpHeaders>> result;
     List<int?> ports = await VPNService.getPortsBySetting(item.proxyStrategy);
+    String? xhwid = item.xhwid ? await Did.getDid() : null;
     for (var port in ports) {
       result = await HttpUtils.httpHeadRequest(
         Uri.parse(item.urlOrPath),
         port,
         userAgent,
-        item.xhwid,
+        xhwid,
         const Duration(seconds: 5),
       );
       if (result.error == null) {

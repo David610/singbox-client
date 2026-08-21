@@ -88,8 +88,7 @@ import 'package:provider/provider.dart';
 import 'package:quick_actions/quick_actions.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:tuple/tuple.dart';
-import 'package:vpn_service/state.dart';
-import 'package:vpn_service/vpn_service.dart';
+import 'package:karing/app/modules/vpn_service_state.dart';
 import 'package:window_manager/window_manager.dart';
 
 class WidgetImportExport {

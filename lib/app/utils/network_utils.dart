@@ -57,13 +57,20 @@ class NetworkUtils {
     return isIpv6(parts[0]);
   }
 
-  static bool isDomain(String value) {
-    if (isIpv4(value) || isIpv6(value)) {
+  static bool isDomain(String value, [bool allowPort = false]) {
+    String host = value;
+    if (allowPort) {
+      final lastColon = value.lastIndexOf(':');
+      if (lastColon > 0 && int.tryParse(value.substring(lastColon + 1)) != null) {
+        host = value.substring(0, lastColon);
+      }
+    }
+    if (isIpv4(host) || isIpv6(host)) {
       return false;
     }
     return RegExp(
       r'^[a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?)+$',
-    ).hasMatch(value);
+    ).hasMatch(host);
   }
 
   static String? getRealDomain(String domain) {
@@ -132,14 +139,44 @@ class NetworkUtils {
     }
   }
 
-  static Future<int> getAvaliablePortNotCloseSocket(List<int> preferred) async {
-    return getAvaliablePort(preferred);
+  /// Like [getAvaliablePort], but keeps the probe socket bound and appends
+  /// it to [sockets] instead of closing it -- avoids a race where another
+  /// process grabs the same port between the check and the caller
+  /// actually using it. The caller is responsible for closing every
+  /// socket in [sockets] once done with the ports.
+  static Future<int> getAvaliablePortNotCloseSocket(
+    List<int> preferred,
+    List<ServerSocket> sockets,
+  ) async {
+    for (final port in preferred) {
+      try {
+        final socket = await ServerSocket.bind(InternetAddress.loopbackIPv4, port);
+        sockets.add(socket);
+        return port;
+      } catch (_) {
+        continue;
+      }
+    }
+    try {
+      final socket = await ServerSocket.bind(InternetAddress.loopbackIPv4, 0);
+      sockets.add(socket);
+      return socket.port;
+    } catch (_) {
+      return 0;
+    }
   }
 
-  static Future<List<NetInterfacesInfo>> getInterfaces() async {
+  static Future<List<NetInterfacesInfo>> getInterfaces({
+    bool filter = false,
+    InternetAddressType? addressType,
+  }) async {
     final result = <NetInterfacesInfo>[];
     try {
-      final interfaces = await NetworkInterface.list();
+      final interfaces = await NetworkInterface.list(
+        includeLoopback: !filter,
+        includeLinkLocal: !filter,
+        type: addressType ?? InternetAddressType.any,
+      );
       for (final iface in interfaces) {
         for (final addr in iface.addresses) {
           result.add(

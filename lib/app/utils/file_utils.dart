@@ -12,11 +12,11 @@ import 'package:url_launcher/url_launcher.dart';
 class FileUtils {
   FileUtils._();
 
-  static Future<void> deletePath(String filePath) async {
+  static Future<void> deletePath(String filePath, {bool recursive = false}) async {
     try {
       final entityType = await FileSystemEntity.type(filePath);
       if (entityType == FileSystemEntityType.directory) {
-        await Directory(filePath).delete(recursive: true);
+        await Directory(filePath).delete(recursive: recursive);
       } else if (entityType != FileSystemEntityType.notFound) {
         await File(filePath).delete();
       }

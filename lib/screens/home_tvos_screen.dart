@@ -7,6 +7,7 @@ import 'dart:math';
 
 import 'package:flutter/material.dart';
 import 'package:karing/app/local_services/vpn_service.dart';
+import 'package:karing/app/modules/vpn_service_state.dart';
 import 'package:karing/app/modules/setting_manager.dart';
 import 'package:karing/app/runtime/return_result.dart';
 import 'package:karing/app/utils/app_lifecycle_state_notify.dart';
@@ -412,7 +413,7 @@ class _HomeTVOSScreenState extends LasyRenderingState<HomeTVOSScreen>
       url,
       proxyPort,
       null,
-      null,
+      const Duration(seconds: 10),
       null,
       null,
     );

@@ -4,14 +4,16 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:karing/app/modules/vpn_service_state.dart';
 import 'package:karing/app/modules/setting_manager.dart';
 import 'package:karing/app/utils/network_utils.dart';
 import 'package:karing/app/utils/path_utils.dart';
 import 'package:karing/app/utils/proxy_conf_utils.dart';
 import 'package:karing/app/utils/singbox_config_builder.dart';
+import 'package:karing/app/utils/singbox_outbound.dart';
 import 'package:karing/app/utils/log.dart';
 
-import 'package:vpn_service/vpn_service.dart';
+import 'package:karing/app/local_services/vpn_service.dart';
 
 class ProxyClusterNode {
   String name = "";

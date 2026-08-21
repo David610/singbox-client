@@ -8,11 +8,15 @@ import 'package:karing/app/runtime/return_result.dart';
 
 class WarpAccount {
   WarpAccount({
-    required this.privateKey,
-    required this.publicKey,
-    required this.license,
-    required this.deviceId,
-    required this.token,
+    this.privateKey = "",
+    this.publicKey = "",
+    this.license = "",
+    this.deviceId = "",
+    this.token = "",
+    this.accountType = "",
+    this.id = "",
+    this.warpPlus = false,
+    this.premiumData = 0,
   });
 
   String privateKey;
@@ -20,6 +24,10 @@ class WarpAccount {
   String license;
   String deviceId;
   String token;
+  String accountType;
+  String id;
+  bool warpPlus;
+  int premiumData;
 }
 
 class CloudflareWarpUtils {

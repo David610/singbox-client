@@ -4,6 +4,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:karing/app/utils/file_saver.dart';
 import 'package:karing/app/local_services/vpn_service.dart';
 import 'package:karing/app/modules/setting_manager.dart';
 import 'package:karing/app/runtime/return_result.dart';
@@ -19,7 +20,7 @@ import 'package:karing/app/utils/path_utils.dart';
 import 'package:karing/app/utils/platform_utils.dart';
 import 'package:karing/app/utils/version_compare_utils.dart';
 import 'package:path/path.dart' as path;
-import 'package:vpn_service/state.dart';
+import 'package:karing/app/modules/vpn_service_state.dart';
 
 class AutoUpdateCheckVersion {
   String latestCheck = "";

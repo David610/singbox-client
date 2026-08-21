@@ -35,15 +35,15 @@ class RulesetCodesUtils {
     return _aclCodes ??= await _load('assets/datas/acl_codes.txt');
   }
 
-  static Future<String> siteCodesHashCode() async {
-    return sha256.convert((await siteCodes()).join(',').codeUnits).toString();
+  static Future<Set<int>> siteCodesHashCode() async {
+    return (await siteCodes()).map((e) => e.hashCode).toSet();
   }
 
-  static Future<String> ipCodesHashCode() async {
-    return sha256.convert((await ipCodes()).join(',').codeUnits).toString();
+  static Future<Set<int>> ipCodesHashCode() async {
+    return (await ipCodes()).map((e) => e.hashCode).toSet();
   }
 
-  static Future<String> aclCodesHashCode() async {
-    return sha256.convert((await aclCodes()).join(',').codeUnits).toString();
+  static Future<Set<int>> aclCodesHashCode() async {
+    return (await aclCodes()).map((e) => e.hashCode).toSet();
   }
 }

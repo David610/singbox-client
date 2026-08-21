@@ -819,7 +819,8 @@ class _NetConnectionsScreenState
       height += 18;
       if (Platform.isAndroid) {
         if (current.package.isNotEmpty) {
-          processIcon = _applicationInfoList[current.package]?.icon;
+          final bytes = _applicationInfoList[current.package]?.icon;
+          processIcon = bytes == null ? null : Image.memory(bytes);
         }
       } else if (Platform.isWindows) {
       } else if (Platform.isMacOS) {

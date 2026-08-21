@@ -10,7 +10,7 @@ import 'package:karing/i18n/strings.g.dart';
 import 'package:karing/screens/theme_config.dart';
 import 'package:karing/screens/widgets/dropdown.dart';
 import 'package:tuple/tuple.dart';
-import 'package:vpn_service/vpn_service.dart';
+import 'package:karing/app/local_services/vpn_service.dart';
 
 //flutter showdialog setstate https://stackoverflow.com/questions/58977815/flutter-setstate-on-showdialog
 class DialogUtilsResult<T> {

@@ -12,7 +12,7 @@ class SystemSchemeUtils {
   static String getClashSchemeWith() => '${getClashScheme()}://';
   static String getSingboxSchemeWith() => '${getSingboxScheme()}://';
 
-  static Future<bool> isRegistered(String scheme) async => false;
+  static bool isRegistered(String scheme) => false;
 
   /// Registers [scheme] as a custom URL scheme handler for this app.
   /// Desktop (Windows/Linux)-only; returns an error message on failure, or
@@ -20,5 +20,5 @@ class SystemSchemeUtils {
   /// via the platform manifest, not at runtime).
   static Future<String?> register(String scheme) async => null;
 
-  static Future<String?> unregister(String scheme) async => null;
+  static String? unregister(String scheme) => null;
 }

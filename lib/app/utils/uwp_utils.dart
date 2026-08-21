@@ -19,6 +19,8 @@ class UWPMapping {
   String displayName;
   String sid;
   bool exempted;
+
+  String get name => displayName;
 }
 
 class UWPUtils {

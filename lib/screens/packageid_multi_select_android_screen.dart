@@ -130,7 +130,7 @@ class _PackageIdMultiSelectAndroidScreenState
     for (var papp in widget.selectedData) {
       if (!exists.contains(papp)) {
         PackageInfoEx info = PackageInfoEx();
-        info.info = PackageInfoImpl(papp);
+        info.info = PackageInfoImpl(packageName: papp);
         info.name = PackageManagerAndroid.kRemoved;
         info.icon = null;
 
@@ -156,10 +156,11 @@ class _PackageIdMultiSelectAndroidScreenState
     if (SettingManager.getConfig().perapp.hideAppIcon) {
       return null;
     }
-    return PackageManagerAndroid.getInstalledPackageIcon(
+    final bytes = await PackageManagerAndroid.getInstalledPackageIcon(
       widget.installedApps,
       packageName,
     );
+    return bytes == null ? null : Image.memory(bytes);
   }
 
   @override

@@ -7,10 +7,22 @@
 // a real Win32 version check is implemented.
 library;
 
+import 'dart:io';
+
 class VersionHelper {
   VersionHelper._();
 
   static final VersionHelper instance = VersionHelper._();
 
   bool get isWindows10RS5OrGreater => false;
+
+  /// Real Windows major version number, parsed from
+  /// `Platform.operatingSystemVersion` (e.g. "Windows 10.0.19045" -> 10);
+  /// 0 on any non-Windows platform or if parsing fails.
+  int get majorVersion {
+    if (!Platform.isWindows) return 0;
+    final match = RegExp(r'(\d+)\.\d+\.\d+').firstMatch(Platform.operatingSystemVersion);
+    if (match == null) return 0;
+    return int.tryParse(match.group(1)!) ?? 0;
+  }
 }

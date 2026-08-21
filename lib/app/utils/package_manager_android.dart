@@ -9,11 +9,24 @@ import 'package:android_package_manager/android_package_manager.dart';
 /// cached together since both require extra platform calls beyond
 /// `getInstalledPackages`.
 class PackageInfoEx {
-  PackageInfoEx({required this.info, this.name = '', this.icon});
+  PackageInfoEx({PackageInfo? info, this.name = '', this.icon})
+    : info = info ?? const PackageInfoImpl();
 
   PackageInfo info;
   String name;
   Uint8List? icon;
+}
+
+/// Minimal, real (not fabricated) `PackageInfo` for a placeholder entry --
+/// used when a previously-selected package is no longer installed (see
+/// perapp_android_screen.dart/packageid_multi_select_android_screen.dart's
+/// "removed app" placeholder row). `android_package_manager`'s own
+/// `PackageInfoImpl` is internal to that package (not exported), so this
+/// is this app's own minimal implementation of the same public
+/// `PackageInfo` contract.
+class PackageInfoImpl extends PackageInfo {
+  const PackageInfoImpl({String? packageName})
+    : super(installLocation: AndroidInstallLocation.auto, packageName: packageName);
 }
 
 class PackageManagerAndroid {
@@ -25,7 +38,7 @@ class PackageManagerAndroid {
   static final AndroidPackageManager _manager = AndroidPackageManager();
 
   static Future<List<PackageInfoEx>> getInstalledPackages({
-    void Function(PackageInfo info)? onValid,
+    bool Function(PackageInfo info)? onValid,
   }) async {
     final packages = await _manager.getInstalledPackages() ?? [];
     final result = <PackageInfoEx>[];
@@ -33,7 +46,9 @@ class PackageManagerAndroid {
       if (info.packageName == null) {
         continue;
       }
-      onValid?.call(info);
+      if (onValid != null && !onValid(info)) {
+        continue;
+      }
       String name = info.packageName!;
       try {
         name =

@@ -4,6 +4,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:karing/app/utils/file_saver.dart';
 import 'package:karing/app/local_services/vpn_service.dart';
 import 'package:karing/app/modules/board_provider_manager.dart';
 import 'package:karing/app/private/app_url_utils_private.dart';
@@ -16,7 +17,7 @@ import 'package:karing/app/utils/log.dart';
 import 'package:karing/app/utils/notice_utils.dart';
 import 'package:karing/app/utils/path_utils.dart';
 import 'package:karing/app/utils/platform_utils.dart';
-import 'package:vpn_service/state.dart';
+import 'package:karing/app/modules/vpn_service_state.dart';
 
 class BoardProviderNoticeItem {
   String providerId = "";
@@ -258,7 +259,7 @@ class BoardProviderNoticeLoadAndCheck {
       _duration = _checkDuration;
       BoardProviderNoticeItem? item = _notice.getByUpdateTime(
         providerId,
-        gnotice.updateTime,
+        gnotice.updateTime.toString(),
       );
       if (item != null) {
         save();
@@ -267,8 +268,8 @@ class BoardProviderNoticeLoadAndCheck {
       BoardProviderNoticeItem newItem = BoardProviderNoticeItem();
       newItem.providerId = providerId;
       newItem.readed = false;
-      newItem.updateTime = gnotice.updateTime;
-      newItem.expireTime = gnotice.expireTime;
+      newItem.updateTime = gnotice.updateTime.toString();
+      newItem.expireTime = gnotice.expireTime.toString();
       newItem.title = name.isEmpty ? gnotice.title : "[$name]${gnotice.title}";
       newItem.content = gnotice.content;
       newItem.url = gnotice.url;

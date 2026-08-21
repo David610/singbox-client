@@ -388,7 +388,7 @@ class _BackupAndSyncWebdavScreenState
       );
       return;
     }
-    _fileList = result.data!;
+    _fileList = result.data!.map((f) => f.name).toList();
     _fileList.sort((a, b) => b.compareTo(a));
 
     setState(() {});

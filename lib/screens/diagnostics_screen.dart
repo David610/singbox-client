@@ -4,6 +4,7 @@
 // still-missing lib/app/utils/ modules or the unreconstructed
 // VPNService/ProxyConfig/ServerConfig classes (see
 // docs/ARCHITECTURE.md §9). This means it can be developed, tested, and
+import 'package:karing/app/modules/vpn_service_state.dart';
 // reviewed independently of that larger reconstruction, and is wired into
 // app navigation once that lands -- see this file's bottom note.
 //
