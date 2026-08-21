@@ -127,6 +127,37 @@ constant, so the `const` constructor invocation is a genuine Dart compile
 error (`Error: Not a constant expression.`), not a flake. Fixed by
 changing both occurrences to `final params = VlessRealityParams(...)`.
 
+A seventh and eighth bug, both in `packages/vpn_core/android/build.gradle`,
+surfaced by the `Build Android` job's first real Gradle run:
+`group = "..."`/`version = "..."` assignments preceded the file's
+`buildscript {}`/`plugins {}` blocks, which Gradle's script-restriction
+rule forbids ("only buildscript {}, pluginManagement {} and other plugins
+{} script blocks are allowed before plugins {} blocks") — fixed by moving
+those two assignments to after the `plugins {}` block. The `dependencies
+{}` block also used `val libboxAar = file(...)`, which is Kotlin syntax
+(`val`/`var`) in a plain `.gradle` (Groovy) file, not `.gradle.kts` —
+Groovy has no `val` keyword, so this would have failed to compile with
+`unable to resolve class val` on the very next line Gradle's parser
+reached once the ordering issue above was fixed. Changed to Groovy's
+`def`. Both verified locally by compiling the file with Groovy's own
+`FileSystemCompiler` (no Android Gradle Plugin needed to catch either —
+one is a Gradle script-restriction error, the other a plain parse error)
+before pushing.
+
+The iOS build job's failure (`Error (Xcode): There is no XCFramework
+found at '.../bind/apple/Libbox.xcframework'`) is a different case: it is
+the *already-documented* "iOS VPN extension target gap" above ("Known
+current-state gaps" §3) surfacing for the first time in a real run, not a
+new bug. `ios/vpnCoreService/PacketTunnelProvider.swift` has a hard
+compile-time `import Libbox` by design (unlike Android's
+file-existence-guarded optional dependency), and no step in this
+repository builds or vendors a real `Libbox.xcframework` yet, nor is
+`vpnCoreService` registered as an Xcode target — see §3's own reasoning
+for why hand-editing `project.pbxproj` without Xcode to validate it was
+judged too risky to attempt blind. No change made here; this stays
+expected-red until a developer with Xcode completes that target
+registration.
+
 ### iOS Xcode version
 
 Because there was no pre-existing pin to preserve, `ios-build.yml` uses
