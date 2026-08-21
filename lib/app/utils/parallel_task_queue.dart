@@ -5,13 +5,8 @@ import 'dart:async';
 import 'dart:collection';
 
 typedef ParallelTaskWorker = Future<String> Function(String task);
-typedef ParallelTaskProgress = void Function(
-  String task,
-  int left,
-  int total,
-  bool start,
-  bool finish,
-);
+typedef ParallelTaskProgress =
+    void Function(String task, int left, int total, bool start, bool finish);
 
 /// Runs [worker] over a queue of string tasks (e.g. DNS/URL candidates),
 /// [concurrency] at a time, reporting progress via [onProgress].

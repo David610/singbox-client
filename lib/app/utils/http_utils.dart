@@ -54,7 +54,10 @@ class HttpUtils {
 
   static List<String> getUserAgents() => _defaultUserAgentCompatibles;
 
-  static List<String> getUserAgentsByUa(List<String> selected, bool onlySelected) {
+  static List<String> getUserAgentsByUa(
+    List<String> selected,
+    bool onlySelected,
+  ) {
     if (!onlySelected) {
       return _defaultUserAgentCompatibles;
     }
@@ -111,7 +114,9 @@ class HttpUtils {
           : String.fromCharCodes(response.data ?? const []);
       return ReturnResult(data: Tuple2(statusCode, body));
     } catch (err) {
-      return ReturnResult(error: ReturnResultError(err.toString(), report: false));
+      return ReturnResult(
+        error: ReturnResultError(err.toString(), report: false),
+      );
     }
   }
 
@@ -143,7 +148,9 @@ class HttpUtils {
         data: Tuple2(statusCode, _DioHttpHeaders(response.headers)),
       );
     } catch (err) {
-      return ReturnResult(error: ReturnResultError(err.toString(), report: false));
+      return ReturnResult(
+        error: ReturnResultError(err.toString(), report: false),
+      );
     }
   }
 
@@ -181,7 +188,9 @@ class HttpUtils {
       final responseBody = String.fromCharCodes(response.data ?? const []);
       return ReturnResult(data: Tuple2(statusCode, responseBody));
     } catch (err) {
-      return ReturnResult(error: ReturnResultError(err.toString(), report: false));
+      return ReturnResult(
+        error: ReturnResultError(err.toString(), report: false),
+      );
     }
   }
 
@@ -196,7 +205,10 @@ class HttpUtils {
     try {
       if (!overwrite && await File(savePath).exists()) {
         return ReturnResult(
-          error: ReturnResultError('file already exists: $savePath', report: false),
+          error: ReturnResultError(
+            'file already exists: $savePath',
+            report: false,
+          ),
         );
       }
       final dio = _client(proxyPort, timeout ?? const Duration(seconds: 30));
@@ -215,7 +227,9 @@ class HttpUtils {
       }
       return ReturnResult(data: _DioHttpHeaders(response.headers));
     } catch (err) {
-      return ReturnResult(error: ReturnResultError(err.toString(), report: false));
+      return ReturnResult(
+        error: ReturnResultError(err.toString(), report: false),
+      );
     }
   }
 

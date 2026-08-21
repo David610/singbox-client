@@ -14,9 +14,9 @@ class ICloudUtils {
   ICloudUtils._();
 
   static ReturnResultError get _unavailable => ReturnResultError(
-        'iCloud backup is not available in this build.',
-        report: false,
-      );
+    'iCloud backup is not available in this build.',
+    report: false,
+  );
 
   static Future<ReturnResult<List<String>>> list() async =>
       ReturnResult(error: _unavailable);

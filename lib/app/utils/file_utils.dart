@@ -84,7 +84,10 @@ class FileUtils {
     }
   }
 
-  static List<String> recursionFile(String dir, {Set<String>? extensionFilter}) {
+  static List<String> recursionFile(
+    String dir, {
+    Set<String>? extensionFilter,
+  }) {
     final result = <String>[];
     final directory = Directory(dir);
     if (!directory.existsSync()) {

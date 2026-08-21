@@ -68,7 +68,9 @@ class ZipUtils {
       final archive = ZipDecoder().decodeBytes(bytes);
       return ReturnResult(data: archive.map((e) => e.name).toList());
     } catch (err) {
-      return ReturnResult(error: ReturnResultError(err.toString(), report: false));
+      return ReturnResult(
+        error: ReturnResultError(err.toString(), report: false),
+      );
     }
   }
 }

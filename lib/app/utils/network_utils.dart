@@ -8,7 +8,11 @@ import 'package:karing/app/runtime/return_result.dart';
 import 'package:tuple/tuple.dart';
 
 class NetInterfacesInfo {
-  NetInterfacesInfo({required this.name, required this.address, required this.type});
+  NetInterfacesInfo({
+    required this.name,
+    required this.address,
+    required this.type,
+  });
 
   String name;
   String address;
@@ -24,9 +28,7 @@ class OutletIpInfo {
 class NetworkUtils {
   NetworkUtils._();
 
-  static final RegExp _ipv4Reg = RegExp(
-    r'^(\d{1,3}\.){3}\d{1,3}$',
-  );
+  static final RegExp _ipv4Reg = RegExp(r'^(\d{1,3}\.){3}\d{1,3}$');
   static final RegExp _ipv4WithMaskReg = RegExp(
     r'^(\d{1,3}\.){3}\d{1,3}/\d{1,2}$',
   );
@@ -59,8 +61,9 @@ class NetworkUtils {
     if (isIpv4(value) || isIpv6(value)) {
       return false;
     }
-    return RegExp(r'^[a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?)+$')
-        .hasMatch(value);
+    return RegExp(
+      r'^[a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?)+$',
+    ).hasMatch(value);
   }
 
   static String? getRealDomain(String domain) {
@@ -152,7 +155,9 @@ class NetworkUtils {
     return result;
   }
 
-  static Future<Tuple2<OutletIpInfo?, String?>> getOutletIp(int localPort) async {
+  static Future<Tuple2<OutletIpInfo?, String?>> getOutletIp(
+    int localPort,
+  ) async {
     return const Tuple2(null, null);
   }
 }

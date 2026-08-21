@@ -73,7 +73,11 @@ class PathUtils {
   }
 
   static String flutterAssetsDir() {
-    return path.join(path.dirname(Platform.resolvedExecutable), 'data', 'flutter_assets');
+    return path.join(
+      path.dirname(Platform.resolvedExecutable),
+      'data',
+      'flutter_assets',
+    );
   }
 
   static String logFileName() => 'app.log';

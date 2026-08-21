@@ -14,8 +14,8 @@ class UriUtils {
     final schemeSep = fixed.indexOf('://');
     if (schemeSep >= 0) {
       final afterScheme = fixed.substring(schemeSep + 3);
-      final hostEnd = RegExp(r'[/?#]').firstMatch(afterScheme)?.start ??
-          afterScheme.length;
+      final hostEnd =
+          RegExp(r'[/?#]').firstMatch(afterScheme)?.start ?? afterScheme.length;
       var host = afterScheme.substring(0, hostEnd);
       final atIdx = host.lastIndexOf('@');
       final hostOnly = atIdx >= 0 ? host.substring(atIdx + 1) : host;
@@ -23,7 +23,8 @@ class UriUtils {
           !hostOnly.startsWith('[') &&
           RegExp(r'^[0-9a-fA-F:]+$').hasMatch(hostOnly)) {
         final fixedHost = '[$hostOnly]';
-        fixed = fixed.substring(0, schemeSep + 3) +
+        fixed =
+            fixed.substring(0, schemeSep + 3) +
             (atIdx >= 0 ? host.substring(0, atIdx + 1) : '') +
             fixedHost +
             afterScheme.substring(hostEnd);

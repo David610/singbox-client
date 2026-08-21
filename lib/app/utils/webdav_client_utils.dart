@@ -17,20 +17,28 @@ class WebdavClientUtils {
     String password,
   ) async {
     try {
-      final client = WebdavClient.basicAuth(url: url, user: user, pwd: password);
+      final client = WebdavClient.basicAuth(
+        url: url,
+        user: user,
+        pwd: password,
+      );
       if (proxyPort != null && proxyPort > 0) {
-        client.setHttpClientAdapter(IOHttpClientAdapter(
-          createHttpClient: () {
-            final httpClient = HttpClient();
-            httpClient.findProxy = (uri) => 'PROXY 127.0.0.1:$proxyPort';
-            return httpClient;
-          },
-        ));
+        client.setHttpClientAdapter(
+          IOHttpClientAdapter(
+            createHttpClient: () {
+              final httpClient = HttpClient();
+              httpClient.findProxy = (uri) => 'PROXY 127.0.0.1:$proxyPort';
+              return httpClient;
+            },
+          ),
+        );
       }
       await client.readDir('/');
       return ReturnResult(data: client);
     } catch (err) {
-      return ReturnResult(error: ReturnResultError(err.toString(), report: false));
+      return ReturnResult(
+        error: ReturnResultError(err.toString(), report: false),
+      );
     }
   }
 
@@ -40,12 +48,16 @@ class WebdavClientUtils {
         message.contains('Connection closed');
   }
 
-  static Future<ReturnResult<List<WebdavFile>>> list(WebdavClient client) async {
+  static Future<ReturnResult<List<WebdavFile>>> list(
+    WebdavClient client,
+  ) async {
     try {
       final files = await client.readDir('/');
       return ReturnResult(data: files);
     } catch (err) {
-      return ReturnResult(error: ReturnResultError(err.toString(), report: false));
+      return ReturnResult(
+        error: ReturnResultError(err.toString(), report: false),
+      );
     }
   }
 

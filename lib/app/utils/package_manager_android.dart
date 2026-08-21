@@ -36,7 +36,8 @@ class PackageManagerAndroid {
       onValid?.call(info);
       String name = info.packageName!;
       try {
-        name = await _manager.getApplicationLabel(
+        name =
+            await _manager.getApplicationLabel(
               packageName: info.packageName!,
             ) ??
             info.packageName!;

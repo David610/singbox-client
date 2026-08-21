@@ -26,9 +26,9 @@ class CloudflareWarpUtils {
   CloudflareWarpUtils._();
 
   static ReturnResultError get _unavailable => ReturnResultError(
-        'Cloudflare WARP account generation is not available in this build.',
-        report: false,
-      );
+    'Cloudflare WARP account generation is not available in this build.',
+    report: false,
+  );
 
   static Future<ReturnResult<Map<String, dynamic>>> genFreeWarpConfig() async =>
       ReturnResult(error: _unavailable);

@@ -19,9 +19,9 @@ class CloudflareWarpApi {
   static const int licenseLength = 26;
 
   static ReturnResultError get _unavailable => ReturnResultError(
-        'Cloudflare WARP account integration is not available in this build.',
-        report: false,
-      );
+    'Cloudflare WARP account integration is not available in this build.',
+    report: false,
+  );
 
   static Future<ReturnResult<WarpDevice>> getDevice(
     String deviceId,

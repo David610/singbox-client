@@ -30,5 +30,8 @@ class UWPUtils {
       ReturnResult(data: <String>{});
 
   // ignore: non_constant_identifier_names
-  static Future<void> SetNetIsolation(Set<String> packageNames, bool exempted) async {}
+  static Future<void> SetNetIsolation(
+    Set<String> packageNames,
+    bool exempted,
+  ) async {}
 }
