@@ -1,0 +1,31 @@
+name: vpn_core
+description: >
+  First-party, in-repo replacement for the missing KaringX `vpn_service`
+  package. Defines a small typed Dart API for controlling a pinned public
+  sing-box/libbox core over Android VpnService / iOS NEPacketTunnelProvider.
+  Owned by this project; not a private/unavailable dependency.
+version: 0.1.0
+publish_to: none
+
+environment:
+  sdk: ">=3.12.2 <4.0.0"
+  flutter: ">=3.35.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  plugin_platform_interface: ^2.1.8
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: 6.0.0
+
+flutter:
+  plugin:
+    platforms:
+      android:
+        package: app.singboxclient.vpn_core
+        pluginClass: VpnCorePlugin
+      ios:
+        pluginClass: VpnCorePlugin
