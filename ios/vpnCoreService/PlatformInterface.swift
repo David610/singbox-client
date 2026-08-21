@@ -313,7 +313,7 @@ final class ExtensionPlatformInterface: NSObject, LibboxPlatformInterfaceProtoco
 
     func clearDNSCache() {
         guard let networkSettings else { return }
-        runBlocking { [self] in
+        try? runBlocking { [self] in
             tunnel.reasserting = true
             defer { tunnel.reasserting = false }
             try? await tunnel.setTunnelNetworkSettings(nil)
@@ -322,9 +322,12 @@ final class ExtensionPlatformInterface: NSObject, LibboxPlatformInterfaceProtoco
     }
 
     func readWIFIState() -> LibboxWIFIState? {
-        runBlocking {
+        // `try?` on a call already returning `NEHotspotNetwork?` flattens to a
+        // single optional (SE-0230), so this chains exactly like the
+        // non-throwing version did.
+        (try? runBlocking {
             await NEHotspotNetwork.fetchCurrent()
-        }.flatMap { LibboxWIFIState($0.ssid, wifiBSSID: $0.bssid) }
+        }).flatMap { LibboxWIFIState($0.ssid, wifiBSSID: $0.bssid) }
     }
 
     // MARK: - CommandServerHandler
