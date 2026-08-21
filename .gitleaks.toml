@@ -42,4 +42,11 @@ paths = [
   # provenance of every one of them.
   '''packages/vpn_core/test/fixtures/singbox_vpn/.*''',
   '''packages/vpn_core/test/interop/.*_test\.dart''',
+
+  # packages/vpn_core/test/diagnostics/: same reasoning -- these tests
+  # deliberately embed the same fake, documented, non-live credential
+  # shapes to prove the central redaction module
+  # (packages/vpn_core/lib/src/diagnostics/redaction.dart) actually masks
+  # them. See redaction_test.dart's own header comment for provenance.
+  '''packages/vpn_core/test/diagnostics/.*_test\.dart''',
 ]

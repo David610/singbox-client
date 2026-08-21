@@ -1,0 +1,579 @@
+name: Release
+
+# Tag-triggered CD: git tag -> reproducible build -> signed artifact ->
+# internal/beta distribution -> GitHub Release. See docs/release/
+# RELEASE_CHECKLIST.md for the full human-readable walkthrough and
+# docs/release/VERSIONING.md for the version-consistency policy this
+# workflow enforces as its first gate.
+#
+# WHAT THIS WORKFLOW NEVER DOES, BY DESIGN:
+#   - It never promotes a Google Play release beyond the `internal`
+#     track (see scripts/release/upload_google_play.py's hard-coded
+#     track allowlist).
+#   - It never submits the iOS build for App Store review or promotes
+#     it beyond TestFlight internal testing.
+#   - It never runs on anything but an explicit `vX.Y.Z+N` tag push --
+#     no push to `main`, no schedule, no automatic re-trigger. Every
+#     release is a deliberate human action (creating and pushing a tag).
+# Promoting a release to production, on either store, is a separate,
+# manual action a human takes in the Play Console / App Store Connect UI
+# -- see docs/release/GOOGLE_PLAY.md and docs/release/APPLE.md.
+#
+# KNOWN CURRENT STATE, read before a red run surprises anyone: every gate
+# job below is expected to behave exactly as its own workflow file
+# documents when run standalone (docs/CI.md "Known current-state gaps")
+# -- app-level analyze/test informational-red, Android/iOS builds
+# genuinely red until lib/app/utils/ and the iOS extension target gap are
+# resolved. This release workflow does not lower that bar; it enforces
+# it as a hard release gate (no continue-on-error here, unlike
+# pr-fast.yml's two informational steps) -- a release cannot ship while
+# those gaps are open, which is the correct behavior for a *release*
+# pipeline even though pr-fast.yml deliberately doesn't block PRs on the
+# same thing.
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: >
+          Tag to release (only needed for a manual re-run; a real tag
+          push doesn't need this -- GITHUB_REF already has it).
+        required: true
+        type: string
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false # never cancel a release mid-flight
+
+permissions:
+  contents: read
+
+env:
+  FLUTTER_VERSION: "3.35.7" # see docs/CI.md "Pinned versions"
+  ANDROID_PACKAGE_NAME: "com.nebula.karing" # android/app/build.gradle.kts applicationId -- update here post-rebrand, see docs/FORK_ARCHITECTURE_AUDIT.md §10
+
+jobs:
+  # ---------------------------------------------------------------
+  # Gate 1: version consistency -- the single source of truth check.
+  # ---------------------------------------------------------------
+  version-consistency:
+    name: Version consistency
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.check.outputs.version }}
+      build_number: ${{ steps.check.outputs.build_number }}
+      tag: ${{ steps.check.outputs.tag }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Tag must exactly match pubspec.yaml's version
+        id: check
+        run: |
+          set -euo pipefail
+          RAW_REF="${GITHUB_REF#refs/tags/}"
+          TAG="${{ github.event_name == 'workflow_dispatch' && inputs.tag || '' }}"
+          TAG="${TAG:-$RAW_REF}"
+          PUBSPEC_VERSION="$(grep -m1 '^version:' pubspec.yaml | sed -E 's/^version:[[:space:]]*//')"
+          EXPECTED_TAG="v${PUBSPEC_VERSION}"
+          echo "tag from ref: $TAG"
+          echo "pubspec.yaml version: $PUBSPEC_VERSION (expects tag $EXPECTED_TAG)"
+          if [ "$TAG" != "$EXPECTED_TAG" ]; then
+            echo "::error::Tag '$TAG' does not match pubspec.yaml's version '$PUBSPEC_VERSION' (expected tag '$EXPECTED_TAG'). See docs/release/VERSIONING.md -- pubspec.yaml is the single source of truth; bump it and re-tag."
+            exit 1
+          fi
+          VERSION_NAME="${PUBSPEC_VERSION%%+*}"
+          BUILD_NUMBER="${PUBSPEC_VERSION##*+}"
+          if [ "$VERSION_NAME" = "$PUBSPEC_VERSION" ] || [ -z "$BUILD_NUMBER" ]; then
+            echo "::error::pubspec.yaml version '$PUBSPEC_VERSION' has no '+<build number>' suffix -- required so Android versionCode / iOS CFBundleVersion are well-defined. See docs/release/VERSIONING.md."
+            exit 1
+          fi
+          echo "version=$VERSION_NAME" >> "$GITHUB_OUTPUT"
+          echo "build_number=$BUILD_NUMBER" >> "$GITHUB_OUTPUT"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+
+  # ---------------------------------------------------------------
+  # Gates 2-6: reuse the exact same jobs PRs are already gated on, as
+  # reusable workflows (workflow_call) -- no logic duplicated, no
+  # separate "release-flavored" copy that could silently drift from
+  # what PRs actually check.
+  # ---------------------------------------------------------------
+  fast-checks:
+    name: "Gate: PR fast checks"
+    needs: version-consistency
+    uses: ./.github/workflows/pr-fast.yml
+
+  compat-checks:
+    name: "Gate: singbox-vpn compatibility"
+    needs: version-consistency
+    uses: ./.github/workflows/singbox-vpn-compat.yml
+
+  supply-chain-checks:
+    name: "Gate: supply chain"
+    needs: version-consistency
+    uses: ./.github/workflows/supply-chain.yml
+
+  android-debug-smoke:
+    name: "Gate: Android debug build"
+    needs: version-consistency
+    uses: ./.github/workflows/android-build.yml
+
+  ios-debug-smoke:
+    name: "Gate: iOS build"
+    needs: version-consistency
+    uses: ./.github/workflows/ios-build.yml
+
+  # ---------------------------------------------------------------
+  # Real, signed release builds -- only after every gate above passes.
+  # ---------------------------------------------------------------
+  android-release-build:
+    name: Android signed release build
+    needs:
+      [fast-checks, compat-checks, supply-chain-checks, android-debug-smoke, version-consistency]
+    runs-on: ubuntu-latest
+    environment: android-release # secrets scoped to this Environment -- see docs/release/RELEASE_CHECKLIST.md "GitHub Environment configuration"
+    outputs:
+      aab_path: build/app/outputs/bundle/release/app-release.aab
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@dded0888837ed1f317902acf8a20df0ad188d165 # v5.0.0
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@40fd30fb8d7440372e1316f5d1809ec01dcd3699 # v4.0.1
+
+      - name: Set up Flutter ${{ env.FLUTTER_VERSION }}
+        uses: subosito/flutter-action@1508160852fb97248640997f7cfb38da241df0ba # v2.9.1
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+
+      - name: flutter pub get
+        run: flutter pub get
+
+      - name: Decode signing keystore
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+        run: |
+          set -euo pipefail
+          if [ -z "${ANDROID_KEYSTORE_BASE64:-}" ]; then
+            echo "::error::ANDROID_KEYSTORE_BASE64 is not set on the android-release Environment. See docs/release/RELEASE_CHECKLIST.md."
+            exit 1
+          fi
+          echo "$ANDROID_KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/release.keystore"
+
+      - name: Write android/key.properties (release signing only -- overwrites the repo's placeholder)
+        env:
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          cat > android/key.properties <<EOF
+          storePassword.release=${ANDROID_KEYSTORE_PASSWORD}
+          keyPassword.release=${ANDROID_KEY_PASSWORD}
+          keyAlias.release=${ANDROID_KEY_ALIAS}
+          storeFile.release=${RUNNER_TEMP}/release.keystore
+          EOF
+
+      - name: Build signed AAB (Google Play)
+        run: >
+          flutter build appbundle --release
+          --build-name=${{ needs.version-consistency.outputs.version }}
+          --build-number=${{ needs.version-consistency.outputs.build_number }}
+
+      - name: Build signed APK (GitHub release / internal sideload testing)
+        run: >
+          flutter build apk --release
+          --build-name=${{ needs.version-consistency.outputs.version }}
+          --build-number=${{ needs.version-consistency.outputs.build_number }}
+
+      - name: Remove decoded keystore and key.properties
+        if: always()
+        run: |
+          shred -u "$RUNNER_TEMP/release.keystore" 2>/dev/null || rm -f "$RUNNER_TEMP/release.keystore"
+          git checkout -- android/key.properties
+
+      - name: Compute checksums
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/checksums"
+          sha256sum build/app/outputs/bundle/release/app-release.aab \
+            > "$RUNNER_TEMP/checksums/android-checksums.txt"
+          for f in build/app/outputs/flutter-apk/*release*.apk; do
+            sha256sum "$f" >> "$RUNNER_TEMP/checksums/android-checksums.txt"
+          done
+          cat "$RUNNER_TEMP/checksums/android-checksums.txt"
+
+      - name: Upload Android release artifacts
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: android-release-${{ needs.version-consistency.outputs.tag }}
+          path: |
+            build/app/outputs/bundle/release/app-release.aab
+            build/app/outputs/flutter-apk/*release*.apk
+            ${{ runner.temp }}/checksums/android-checksums.txt
+          retention-days: 90
+
+  ios-release-build:
+    name: iOS signed release build
+    needs: [fast-checks, compat-checks, supply-chain-checks, ios-debug-smoke, version-consistency]
+    runs-on: macos-latest
+    environment: ios-release # secrets scoped to this Environment
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Flutter ${{ env.FLUTTER_VERSION }}
+        uses: subosito/flutter-action@1508160852fb97248640997f7cfb38da241df0ba # v2.9.1
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+
+      - name: flutter pub get
+        run: flutter pub get
+
+      - name: Install CocoaPods 1.16.2 # pinned in ios/Podfile.lock -- see docs/CI.md
+        run: gem install cocoapods -v 1.16.2 --no-document
+
+      - name: pod install
+        working-directory: ios
+        run: pod install --repo-update
+
+      - name: Import signing certificate and provisioning profile(s)
+        env:
+          IOS_DIST_CERTIFICATE_P12_BASE64: ${{ secrets.IOS_DIST_CERTIFICATE_P12_BASE64 }}
+          IOS_DIST_CERTIFICATE_PASSWORD: ${{ secrets.IOS_DIST_CERTIFICATE_PASSWORD }}
+          IOS_PROVISIONING_PROFILE_BASE64: ${{ secrets.IOS_PROVISIONING_PROFILE_BASE64 }}
+        run: |
+          set -euo pipefail
+          if [ -z "${IOS_DIST_CERTIFICATE_P12_BASE64:-}" ]; then
+            echo "::error::IOS_DIST_CERTIFICATE_P12_BASE64 is not set on the ios-release Environment. See docs/release/RELEASE_CHECKLIST.md."
+            exit 1
+          fi
+          KEYCHAIN="$RUNNER_TEMP/release-signing.keychain-db"
+          KEYCHAIN_PASSWORD="$(openssl rand -base64 24)"
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+
+          echo "$IOS_DIST_CERTIFICATE_P12_BASE64" | base64 -d > "$RUNNER_TEMP/dist.p12"
+          security import "$RUNNER_TEMP/dist.p12" -k "$KEYCHAIN" -P "$IOS_DIST_CERTIFICATE_PASSWORD" \
+            -T /usr/bin/codesign -T /usr/bin/security
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+          security list-keychain -d user -s "$KEYCHAIN" $(security list-keychains -d user | tr -d '"')
+          rm -f "$RUNNER_TEMP/dist.p12"
+
+          mkdir -p "$HOME/Library/MobileDevice/Provisioning Profiles"
+          echo "$IOS_PROVISIONING_PROFILE_BASE64" | base64 -d \
+            > "$HOME/Library/MobileDevice/Provisioning Profiles/release.mobileprovision"
+          # KNOWN GAP (see this workflow's header and docs/CI.md "iOS
+          # extension target gap"): a second profile for the
+          # PacketTunnel/NetworkExtension target
+          # (IOS_EXTENSION_PROVISIONING_PROFILE_BASE64) is provisioned
+          # for by docs/release/RELEASE_CHECKLIST.md but not imported
+          # here yet -- the Xcode project does not register that target
+          # as a separate signable product today, so there is nothing
+          # for a second profile to sign against until that lands.
+
+      - name: Write ExportOptions.plist
+        env:
+          IOS_TEAM_ID: ${{ secrets.IOS_TEAM_ID }}
+          IOS_PROVISIONING_PROFILE_NAME: ${{ secrets.IOS_PROVISIONING_PROFILE_NAME }}
+        run: |
+          set -euo pipefail
+          if [ -z "${IOS_TEAM_ID:-}" ]; then
+            echo "::error::IOS_TEAM_ID is not set on the ios-release Environment."
+            exit 1
+          fi
+          cat > "$RUNNER_TEMP/ExportOptions.plist" <<EOF
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>method</key>
+            <string>app-store-connect</string>
+            <key>teamID</key>
+            <string>${IOS_TEAM_ID}</string>
+            <key>signingStyle</key>
+            <string>manual</string>
+            <key>provisioningProfiles</key>
+            <dict>
+              <key>${{ env.ANDROID_PACKAGE_NAME }}</key>
+              <string>${IOS_PROVISIONING_PROFILE_NAME}</string>
+            </dict>
+            <key>uploadSymbols</key>
+            <true/>
+          </dict>
+          </plist>
+          EOF
+        # NOTE: the <key> under provisioningProfiles must be the iOS
+        # bundle identifier, not the Android package name -- env.ANDROID_PACKAGE_NAME
+        # is reused here ONLY because this fork's iOS and Android
+        # applicationId/bundle ID happen to share the same string today
+        # (com.nebula.karing) per docs/FORK_ARCHITECTURE_AUDIT.md. If
+        # that ever diverges, introduce a separate IOS_BUNDLE_ID env var
+        # here rather than assuming they match.
+
+      - name: flutter build ipa (signed, App Store method)
+        run: >
+          flutter build ipa --release
+          --build-name=${{ needs.version-consistency.outputs.version }}
+          --build-number=${{ needs.version-consistency.outputs.build_number }}
+          --export-options-plist="$RUNNER_TEMP/ExportOptions.plist"
+
+      - name: Remove imported certificate/profile
+        if: always()
+        run: |
+          security delete-keychain "$RUNNER_TEMP/release-signing.keychain-db" 2>/dev/null || true
+          rm -f "$HOME/Library/MobileDevice/Provisioning Profiles/release.mobileprovision"
+
+      - name: Compute checksums
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/checksums"
+          find build/ios/ipa -name '*.ipa' -exec sha256sum {} \; > "$RUNNER_TEMP/checksums/ios-checksums.txt"
+          cat "$RUNNER_TEMP/checksums/ios-checksums.txt"
+
+      - name: Upload iOS release artifacts
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ios-release-${{ needs.version-consistency.outputs.tag }}
+          path: |
+            build/ios/ipa/*.ipa
+            ${{ runner.temp }}/checksums/ios-checksums.txt
+          retention-days: 90
+
+  # ---------------------------------------------------------------
+  # Internal/beta distribution -- automatic. Production promotion is a
+  # separate, manual action -- see this file's header.
+  # ---------------------------------------------------------------
+  google-play-internal:
+    name: "Distribute: Google Play Internal Testing"
+    needs: [android-release-build, version-consistency]
+    runs-on: ubuntu-latest
+    environment: android-release
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Download AAB
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: android-release-${{ needs.version-consistency.outputs.tag }}
+          path: android-artifacts
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+
+      - name: Install Google Play API client
+        run: pip install --no-cache-dir google-api-python-client google-auth
+
+      - name: Upload to Play Internal Testing track
+        env:
+          GOOGLE_PLAY_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON }}
+        run: |
+          if [ -z "${GOOGLE_PLAY_SERVICE_ACCOUNT_JSON:-}" ]; then
+            echo "::error::GOOGLE_PLAY_SERVICE_ACCOUNT_JSON is not set on the android-release Environment. See docs/release/GOOGLE_PLAY.md."
+            exit 1
+          fi
+          python3 scripts/release/upload_google_play.py \
+            --package-name "${{ env.ANDROID_PACKAGE_NAME }}" \
+            --aab android-artifacts/app-release.aab \
+            --track internal
+
+  testflight-upload:
+    name: "Distribute: TestFlight Internal Testing"
+    needs: [ios-release-build, version-consistency]
+    runs-on: macos-latest
+    environment: ios-release
+    steps:
+      - name: Download IPA
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: ios-release-${{ needs.version-consistency.outputs.tag }}
+          path: ios-artifacts
+
+      - name: Install App Store Connect API key
+        env:
+          APP_STORE_CONNECT_API_KEY_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}
+          APP_STORE_CONNECT_API_KEY_BASE64: ${{ secrets.APP_STORE_CONNECT_API_KEY_BASE64 }}
+        run: |
+          set -euo pipefail
+          if [ -z "${APP_STORE_CONNECT_API_KEY_BASE64:-}" ]; then
+            echo "::error::APP_STORE_CONNECT_API_KEY_BASE64 is not set on the ios-release Environment. See docs/release/APPLE.md."
+            exit 1
+          fi
+          mkdir -p "$HOME/.appstoreconnect/private_keys"
+          echo "$APP_STORE_CONNECT_API_KEY_BASE64" | base64 -d \
+            > "$HOME/.appstoreconnect/private_keys/AuthKey_${APP_STORE_CONNECT_API_KEY_ID}.p8"
+
+      - name: Upload to TestFlight via App Store Connect API key
+        env:
+          APP_STORE_CONNECT_API_KEY_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}
+          APP_STORE_CONNECT_API_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_API_ISSUER_ID }}
+        run: |
+          set -euo pipefail
+          IPA_PATH="$(find ios-artifacts -name '*.ipa' | head -1)"
+          if [ -z "$IPA_PATH" ]; then
+            echo "::error::no .ipa found in downloaded ios-release artifact"
+            exit 1
+          fi
+          xcrun altool --upload-app -f "$IPA_PATH" -t ios \
+            --apiKey "$APP_STORE_CONNECT_API_KEY_ID" \
+            --apiIssuer "$APP_STORE_CONNECT_API_ISSUER_ID"
+          echo "Uploaded to App Store Connect. It becomes visible under TestFlight -> Internal Testing once Apple finishes processing (usually minutes) -- production submission remains a separate, manual App Store Connect action. See docs/release/APPLE.md."
+
+      - name: Remove App Store Connect API key
+        if: always()
+        run: rm -rf "$HOME/.appstoreconnect"
+
+  # ---------------------------------------------------------------
+  # GitHub Release: artifacts, changelog, checksums, corresponding
+  # source (GPL-3.0 -- see docs/FORK_ARCHITECTURE_AUDIT.md §10), and a
+  # dependency/core version manifest.
+  # ---------------------------------------------------------------
+  github-release:
+    name: Create GitHub Release
+    needs: [android-release-build, ios-release-build, version-consistency]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout (full history for changelog)
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+
+      - name: Set up Flutter ${{ env.FLUTTER_VERSION }}
+        uses: subosito/flutter-action@1508160852fb97248640997f7cfb38da241df0ba # v2.9.1
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+
+      - name: Set up Go
+        uses: actions/setup-go@44694675825211faa026b3c33043df3e48a5fa00 # v6.0.0
+        with:
+          go-version-file: packages/vpn_core/native/singbox-go/go.mod
+
+      - name: Download Android artifacts
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: android-release-${{ needs.version-consistency.outputs.tag }}
+          path: release-assets
+
+      - name: Download iOS artifacts
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: ios-release-${{ needs.version-consistency.outputs.tag }}
+          path: release-assets
+
+      - name: Merge checksum files
+        run: |
+          cat release-assets/android-checksums.txt release-assets/ios-checksums.txt \
+            > release-assets/CHECKSUMS.txt 2>/dev/null || true
+          rm -f release-assets/android-checksums.txt release-assets/ios-checksums.txt
+          cat release-assets/CHECKSUMS.txt
+
+      - name: Generate changelog since previous tag
+        id: changelog
+        run: |
+          set -euo pipefail
+          CURRENT_TAG="${{ needs.version-consistency.outputs.tag }}"
+          PREVIOUS_TAG="$(git tag --sort=-creatordate | grep -A1 "^${CURRENT_TAG}$" | tail -1)"
+          {
+            echo "changelog<<CHANGELOG_EOF"
+            echo "## Changes"
+            echo ""
+            if [ -n "$PREVIOUS_TAG" ] && [ "$PREVIOUS_TAG" != "$CURRENT_TAG" ]; then
+              git log --pretty='- %s (%h)' "${PREVIOUS_TAG}..${CURRENT_TAG}"
+            else
+              echo "_(first tagged release -- no previous tag to diff against)_"
+            fi
+            echo "CHANGELOG_EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Generate corresponding source archive (GPL-3.0)
+        run: |
+          set -euo pipefail
+          # A plain `git archive` of the exact tagged commit -- the
+          # complete corresponding source for the binaries in this
+          # release, satisfying GPL-3.0's source-distribution
+          # requirement (see LICENSE and docs/FORK_ARCHITECTURE_AUDIT.md
+          # §10 for this project's own license situation). This is NOT
+          # the same as "browse the repo on GitHub" -- it's a durable,
+          # attached artifact tied to this exact release.
+          git archive --format=tar.gz \
+            --prefix="singbox-client-${{ needs.version-consistency.outputs.tag }}-source/" \
+            -o "release-assets/singbox-client-${{ needs.version-consistency.outputs.tag }}-source.tar.gz" \
+            "${{ needs.version-consistency.outputs.tag }}"
+
+      - name: Generate dependency / core version manifest
+        run: |
+          set -euo pipefail
+          flutter pub get
+          (cd packages/vpn_core && flutter pub get)
+          {
+            echo "# Dependency / core version manifest"
+            echo "Release: ${{ needs.version-consistency.outputs.tag }}"
+            echo "Generated: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+            echo ""
+            echo "## Pinned sing-box/libbox core"
+            cat packages/vpn_core/UPSTREAM_VERSION.md
+            echo ""
+            echo "## Dart (app)"
+            dart pub deps --style=compact
+            echo ""
+            echo "## Dart (vpn_core)"
+            (cd packages/vpn_core && dart pub deps --style=compact)
+            echo ""
+            echo "## Go (native/singbox-go)"
+            (cd packages/vpn_core/native/singbox-go && go list -m all)
+          } > release-assets/DEPENDENCY_MANIFEST.txt
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@3d0d9888cb7fd7b750713d6e236d1fcb99157228 # v3.0.2
+        with:
+          tag_name: ${{ needs.version-consistency.outputs.tag }}
+          name: ${{ needs.version-consistency.outputs.tag }}
+          # Always a PRE-release: this workflow only ever reaches
+          # internal/beta distribution -- see this file's header. A
+          # human removes the "pre-release" flag manually, as one part
+          # of the manual production-promotion step documented in
+          # docs/release/RELEASE_CHECKLIST.md, once store production
+          # promotion has actually happened.
+          prerelease: true
+          body: |
+            ${{ steps.changelog.outputs.changelog }}
+
+            ## Distribution status
+
+            - Google Play: uploaded to **Internal Testing** only. Production/closed-testing promotion is a manual Play Console action -- see docs/release/GOOGLE_PLAY.md.
+            - TestFlight: uploaded to **Internal Testing** only. App Store submission is a manual App Store Connect action -- see docs/release/APPLE.md.
+            - Physical-device acceptance: see docs/DEVICE_ACCEPTANCE.md for the required manual sign-off before any production promotion.
+
+            ## Source
+
+            This project is GPL-3.0 licensed (see LICENSE). The attached `*-source.tar.gz` is the complete corresponding source for the binaries in this release, pinned to this exact tag.
+          files: |
+            release-assets/*.aab
+            release-assets/*.apk
+            release-assets/*.ipa
+            release-assets/CHECKSUMS.txt
+            release-assets/*-source.tar.gz
+            release-assets/DEPENDENCY_MANIFEST.txt
+          fail_on_unmatched_files: true

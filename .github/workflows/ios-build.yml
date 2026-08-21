@@ -43,6 +43,7 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
+  workflow_call: # so .github/workflows/release.yml can gate a release on this job (unsigned-build smoke test, distinct from the real signed release build)
 
 concurrency:
   group: ios-build-${{ github.event.pull_request.number || github.ref }}
