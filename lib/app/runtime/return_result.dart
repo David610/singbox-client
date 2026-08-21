@@ -15,5 +15,4 @@ class ReturnResult<T> {
   T? data;
 }
 
-
 //https://codewithandrea.com/articles/flutter-exception-handling-try-catch-result-type/

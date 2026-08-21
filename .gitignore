@@ -33,6 +33,11 @@ migrate_working_dir/
 .pub-cache/
 .pub/
 /build/
+# Only the root build/ dir was ignored -- packages/vpn_core/build/ (and
+# any future workspace package's build output) wasn't, and showed up as
+# untracked the first time `flutter test`/`flutter pub get` actually ran
+# in packages/vpn_core in this environment.
+packages/*/build/
 
 # Web related
 lib/generated_plugin_registrant.dart

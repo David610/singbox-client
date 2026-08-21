@@ -147,11 +147,12 @@ dependencies:
     git:
       url: https://github.com/KaringX/move_to_background.git
       ref: 9720fa00946af134caf04b05702230d4329f857f
-  vpn_service:
-    path: ../vpn-service/
-    #git:
-      #url: https://github.com/KaringX/vpn-service.git
-      #ref: main
+  # Replaced KaringX's private `vpn_service` (path: ../vpn-service/, never
+  # present in this repo -- see docs/FORK_ARCHITECTURE_AUDIT.md) with a
+  # first-party, in-repo package backed by a pinned public sing-box/libbox
+  # core. See docs/ARCHITECTURE.md.
+  vpn_core:
+    path: packages/vpn_core
 
 dev_dependencies:
   source_gen: 4.2.3

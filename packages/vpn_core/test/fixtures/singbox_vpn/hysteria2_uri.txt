@@ -1,0 +1,1 @@
+hysteria2://test-h2-fake-password-000@vpn.singboxvpn.test.invalid:8444?sni=vpn.singboxvpn.test.invalid&insecure=0&obfs=salamander&obfs-password=test-salamander-fake-000#Hysteria2

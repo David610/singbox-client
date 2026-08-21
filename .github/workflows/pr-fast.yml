@@ -1,0 +1,110 @@
+name: PR fast checks
+
+# The required, always-on merge gate: format, static analysis, and unit
+# tests for both the app and packages/vpn_core. No native builds, no
+# external network dependency beyond fetching the pinned Flutter SDK and
+# pub/npm-style package metadata -- this is meant to return in minutes,
+# every PR. See docs/CI.md "Fast PR gate vs. integration gate".
+#
+# KNOWN CURRENT STATE (read before treating a red run as a PR's fault):
+# `flutter analyze`/`flutter test` on the root app are EXPECTED TO FAIL
+# today, independent of any given PR's content -- lib/app/utils/ (57
+# files) and the VPNService/ProxyConfig/ServerConfig data models are not
+# yet reconstructed in this fork (docs/ARCHITECTURE.md §9). This workflow
+# reports that honestly rather than scoping analysis down to only the
+# parts that currently pass. packages/vpn_core is unaffected and expected
+# to pass. See docs/CI.md for the full explanation.
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+  workflow_call: # so .github/workflows/release.yml can gate a release on this job
+
+concurrency:
+  group: pr-fast-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  # Pinned to the exact latest patch of the minor version this repo's
+  # pubspec.yaml already declares as its floor (`flutter: ">=3.35.0"`) --
+  # not upgraded to a newer minor. See docs/CI.md "Pinned versions".
+  FLUTTER_VERSION: "3.44.9"
+
+jobs:
+  format-analyze-test:
+    name: Format, analyze, test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Flutter ${{ env.FLUTTER_VERSION }}
+        uses: subosito/flutter-action@1508160852fb97248640997f7cfb38da241df0ba # v2.9.1
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+
+      - name: Cache pub dependencies
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.pub-cache
+          key: pub-${{ runner.os }}-${{ hashFiles('pubspec.lock', 'packages/vpn_core/pubspec.lock') }}
+          restore-keys: |
+            pub-${{ runner.os }}-
+
+      - name: flutter pub get (app)
+        run: flutter pub get
+
+      - name: flutter pub get (vpn_core)
+        working-directory: packages/vpn_core
+        run: flutter pub get
+
+      - name: dart format --set-exit-if-changed
+        run: dart format --output=none --set-exit-if-changed .
+
+      - name: flutter analyze (app) [informational -- see docs/CI.md]
+        # continue-on-error, NOT because analyze errors don't matter, but
+        # because this is currently red for the whole tree regardless of
+        # what any PR changes (docs/ARCHITECTURE.md §9: lib/app/utils/ and
+        # VPNService/ProxyConfig/ServerConfig are not yet reconstructed in
+        # this fork). A required check that can never pass is not a
+        # merge gate, it's a permanent block -- so this step still runs
+        # and its output is still visible (failures ARE real signal, just
+        # not yet a blocking one), but it does not fail the job. Remove
+        # continue-on-error once that reconstruction lands -- see
+        # docs/CI.md "Flipping app analyze/test to required".
+        run: flutter analyze
+        continue-on-error: true
+
+      - name: flutter analyze (vpn_core)
+        working-directory: packages/vpn_core
+        run: flutter analyze
+
+      - name: flutter test (app) [informational -- see docs/CI.md]
+        run: flutter test
+        continue-on-error: true
+
+      - name: flutter test (vpn_core, unit + fixture tests)
+        working-directory: packages/vpn_core
+        run: flutter test --exclude-tags=interop
+
+      - name: Summary
+        if: always()
+        run: |
+          {
+            echo "### Fast PR checks"
+            echo ""
+            echo "- App \`flutter analyze\`/\`flutter test\`: known-red until"
+            echo "  docs/ARCHITECTURE.md §9's remaining incompatibilities are"
+            echo "  fixed (lib/app/utils/, VPNService/ProxyConfig/ServerConfig)."
+            echo "- packages/vpn_core \`flutter analyze\`/\`flutter test\`: must"
+            echo "  be green -- this is the actively maintained VPN core boundary."
+          } >> "$GITHUB_STEP_SUMMARY"

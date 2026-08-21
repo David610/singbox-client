@@ -1,0 +1,127 @@
+name: iOS build
+
+# Builds the Flutter app for iOS (no code signing) and, separately,
+# compiles the FULL Xcode scheme via `xcodebuild` -- which is what
+# actually forces the embedded PacketTunnel/NetworkExtension target to
+# compile, since `flutter build ios` alone only builds the Runner app
+# target and silently ignores embedded extensions.
+#
+# KNOWN CURRENT STATE, stated plainly rather than papered over (this is
+# the single most important comment in this file):
+#
+#   1. `flutter build ios` is expected to fail today at the Dart-compile
+#      step, for the same pre-existing reasons as pr-fast.yml's app
+#      analyze/test (docs/ARCHITECTURE.md §9).
+#   2. EVEN IF (1) is fixed, `xcodebuild` compiling the full `Runner`
+#      scheme is expected to fail on the embedded extension target,
+#      because:
+#      - The Xcode project's only currently-REGISTERED extension target
+#        is still the old "karingService", pointing at
+#        ios/karingService/PacketTunnelProvider.swift, which imports the
+#        still-missing `LibVpnCore` framework (see
+#        docs/FORK_ARCHITECTURE_AUDIT.md §5).
+#      - This project's NEW replacement,
+#        ios/vpnCoreService/PacketTunnelProvider.swift (see
+#        docs/ARCHITECTURE.md §7 and docs/BUILDING.md "iOS"), is not yet
+#        wired into the .xcodeproj as its own target -- that requires
+#        interactive Xcode project surgery documented as a prerequisite
+#        in docs/BUILDING.md, out of scope for this CI-only task.
+#
+# This job is intentionally NOT continue-on-error: per this task's own
+# instruction ("fail if the VPN extension does not compile"), a build
+# step is binary pass/fail by nature. It stays red, honestly, until the
+# Xcode target work lands -- see docs/CI.md "iOS extension target gap".
+#
+# Do not read a green run of this workflow (once it exists) as proof the
+# app works on a real iPhone -- a simulator/unsigned build proves the
+# code compiles, nothing about NetworkExtension actually functioning on
+# device. See docs/SINGBOX_VPN_COMPATIBILITY.md.
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+  workflow_call: # so .github/workflows/release.yml can gate a release on this job (unsigned-build smoke test, distinct from the real signed release build)
+
+concurrency:
+  group: ios-build-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  FLUTTER_VERSION: "3.44.9" # see docs/CI.md "Pinned versions"
+  COCOAPODS_VERSION: "1.16.2" # pinned in ios/Podfile.lock ("COCOAPODS:")
+
+jobs:
+  ios-build:
+    name: Build iOS app + compile VPN extension target
+    runs-on: macos-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Flutter ${{ env.FLUTTER_VERSION }}
+        uses: subosito/flutter-action@1508160852fb97248640997f7cfb38da241df0ba # v2.9.1
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+
+      - name: Cache pub dependencies
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.pub-cache
+          key: pub-${{ runner.os }}-${{ hashFiles('pubspec.lock', 'packages/vpn_core/pubspec.lock') }}
+          restore-keys: pub-${{ runner.os }}-
+
+      - name: Cache CocoaPods
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ios/Pods
+            ~/Library/Caches/CocoaPods
+          key: pods-${{ runner.os }}-${{ hashFiles('ios/Podfile.lock') }}
+          restore-keys: pods-${{ runner.os }}-
+
+      - name: flutter pub get
+        run: flutter pub get
+
+      - name: Install CocoaPods ${{ env.COCOAPODS_VERSION }}
+        run: gem install cocoapods -v ${{ env.COCOAPODS_VERSION }} --no-document
+
+      - name: pod install
+        working-directory: ios
+        run: pod install --repo-update
+
+      - name: flutter build ios (no codesign)
+        # Proves the Dart/Flutter side and the Runner app target's own
+        # compilation -- does NOT touch the embedded extension target;
+        # see this file's header.
+        run: flutter build ios --release --no-codesign
+
+      - name: xcodebuild Runner scheme (forces the embedded VPN extension to compile)
+        working-directory: ios
+        run: |
+          xcodebuild build \
+            -workspace Runner.xcworkspace \
+            -scheme Runner \
+            -configuration Release \
+            -destination 'generic/platform=iOS' \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            DEVELOPMENT_TEAM=""
+
+      - name: Summary
+        if: always()
+        run: |
+          {
+            echo "### iOS build"
+            echo ""
+            echo "See this workflow file's header comment for exactly why"
+            echo "this is expected to be red today and what unblocks it."
+          } >> "$GITHUB_STEP_SUMMARY"

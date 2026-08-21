@@ -1,0 +1,162 @@
+name: singbox-vpn compatibility
+
+# Validates packages/vpn_core against the target server project
+# (David610/singbox-vpn) at two levels:
+#   1. Parser/config tests against fixtures traced from singbox-vpn's own
+#      render.rs/server.rs (packages/vpn_core/test/singbox_vpn_compat_test.dart)
+#      -- pure Dart, fast, always runs.
+#   2. Real headless protocol interop (packages/vpn_core/test/interop/):
+#      a pinned sing-box binary, built from source at the exact commit
+#      pinned in packages/vpn_core/UPSTREAM_VERSION.md, run as both
+#      client and server over loopback with fake ephemeral TEST
+#      credentials generated fresh on every run (see
+#      packages/vpn_core/test/fixtures/singbox_vpn/README.md) -- never a
+#      real subscription, never a committed secret.
+#
+# SCOPE, restated because it matters most: a green run here proves the
+# generated config + pinned sing-box core interoperate. It proves NOTHING
+# about android.net.VpnService or NEPacketTunnelProvider -- see
+# docs/SINGBOX_VPN_COMPATIBILITY.md. This is why this workflow does not
+# even attempt an Android/iOS build; that's android-build.yml/ios-build.yml.
+#
+# This is the one workflow allowed to build from source (the pinned
+# sing-box Go module) rather than only use pre-built tooling -- building
+# it is itself part of what's being validated (the pin resolves, per
+# packages/vpn_core/UPSTREAM_VERSION.md).
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+  workflow_call: # so .github/workflows/release.yml can gate a release on this job
+
+concurrency:
+  group: singbox-vpn-compat-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  FLUTTER_VERSION: "3.44.9" # see docs/CI.md "Pinned versions"
+  # Must match packages/vpn_core/native/singbox-go/go.mod's `go` directive.
+  GO_VERSION: "1.24.7"
+  SING_BOX_PIN_TAG: "v1.13.19" # packages/vpn_core/UPSTREAM_VERSION.md
+  SING_BOX_PIN_COMMIT: "b5ebaa1fc0f2b94256180b95468e73ef53caa27d"
+
+jobs:
+  parser-and-config-tests:
+    name: Parser + config tests (fixtures, no native binary needed)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Flutter ${{ env.FLUTTER_VERSION }}
+        uses: subosito/flutter-action@1508160852fb97248640997f7cfb38da241df0ba # v2.9.1
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+
+      - name: Cache pub dependencies
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.pub-cache
+          key: pub-${{ runner.os }}-${{ hashFiles('pubspec.lock', 'packages/vpn_core/pubspec.lock') }}
+          restore-keys: pub-${{ runner.os }}-
+
+      - name: flutter pub get (vpn_core)
+        working-directory: packages/vpn_core
+        run: flutter pub get
+
+      - name: Parser/config fixture tests
+        working-directory: packages/vpn_core
+        run: flutter test test/singbox_config_builder_test.dart test/singbox_vpn_compat_test.dart
+
+  headless-protocol-interop:
+    name: Headless protocol interop (real pinned sing-box binary)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Flutter ${{ env.FLUTTER_VERSION }}
+        uses: subosito/flutter-action@1508160852fb97248640997f7cfb38da241df0ba # v2.9.1
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+
+      - name: Set up Go ${{ env.GO_VERSION }}
+        uses: actions/setup-go@44694675825211faa026b3c33043df3e48a5fa00 # v6.0.0
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: false # cache keyed manually below against the pinned go.sum
+
+      - name: Cache Go build/module cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/go/pkg/mod
+            ~/.cache/go-build
+          key: go-singbox-${{ env.SING_BOX_PIN_COMMIT }}
+          restore-keys: go-singbox-
+
+      - name: Cache pub dependencies
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.pub-cache
+          key: pub-${{ runner.os }}-${{ hashFiles('pubspec.lock', 'packages/vpn_core/pubspec.lock') }}
+          restore-keys: pub-${{ runner.os }}-
+
+      - name: flutter pub get (vpn_core)
+        working-directory: packages/vpn_core
+        run: flutter pub get
+
+      - name: Verify the pin resolves and compiles (packages/vpn_core/native/singbox-go)
+        working-directory: packages/vpn_core/native/singbox-go
+        run: |
+          go mod verify
+          go build -tags "with_gvisor with_quic with_wireguard with_utls with_clash_api" .
+
+      - name: Build the pinned sing-box binary
+        # Installs the exact tag pinned in UPSTREAM_VERSION.md via `go
+        # install`, matching the module requirement verified above --
+        # NOT `go install .../sing-box@latest`. See docs/CI.md
+        # "Building sing-box for the interop job" for why this, rather
+        # than downloading a third-party prebuilt binary, is the chosen
+        # approach (source-verifiable, hash-pinned via go.sum, no trust
+        # in an opaque release artifact).
+        run: |
+          mkdir -p "$RUNNER_TEMP/singbox-bin"
+          GOBIN="$RUNNER_TEMP/singbox-bin" go install \
+            -tags "with_gvisor with_quic with_wireguard with_utls with_clash_api" \
+            "github.com/sagernet/sing-box/cmd/sing-box@${SING_BOX_PIN_TAG}"
+          echo "$RUNNER_TEMP/singbox-bin" >> "$GITHUB_PATH"
+          echo "SING_BOX_BIN=$RUNNER_TEMP/singbox-bin/sing-box" >> "$GITHUB_ENV"
+
+      - name: Verify the built binary's version output is non-empty (sanity check)
+        run: "$SING_BOX_BIN version"
+
+      - name: Real VLESS+REALITY and Hysteria2 interop tests
+        working-directory: packages/vpn_core
+        run: flutter test --tags=interop test/interop/
+        env:
+          SING_BOX_BIN: ${{ env.SING_BOX_BIN }}
+          # Per docs/CI.md and singbox-vpn's own VPN1_REQUIRE_REAL_INTEROP
+          # precedent: these tests must NOT silently skip in CI. If
+          # SING_BOX_BIN/openssl aren't resolvable here, that is itself a
+          # CI environment bug to fix, not a green light to skip real
+          # protocol validation.
+          VPN_CORE_REQUIRE_REAL_INTEROP: "1"
+
+      - name: Fail if the interop suite silently skipped everything
+        if: always()
+        run: |
+          if [ ! -f "$RUNNER_TEMP/singbox-bin/sing-box" ]; then
+            echo "::error::sing-box binary was not built -- interop tests could only have skipped, not really run."
+            exit 1
+          fi

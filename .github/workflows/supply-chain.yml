@@ -1,0 +1,284 @@
+name: Supply chain checks
+
+# Lightweight, self-contained checks that never send this repository's
+# source to a third-party SaaS: secret scanning (gitleaks, run as a
+# locally-executed binary, not a hosted service), lockfile consistency
+# (pubspec.lock / go.sum must already match their manifests -- no
+# network calls beyond fetching the tools themselves), a dependency
+# manifest (not full per-package license text -- see docs/CI.md
+# "License inventory scope"), and known-vulnerability scanning via OSV
+# (queries the public osv.dev database by package name+version only,
+# never uploads source).
+#
+# Both gitleaks and osv-scanner are built from source via `go install`
+# at a pinned tag, the same source-verifiable approach used for the
+# pinned sing-box binary in singbox-vpn-compat.yml -- not a downloaded
+# opaque binary, not a third-party Action with broad repo permissions.
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+  workflow_call: # so .github/workflows/release.yml can gate a release on this job
+
+concurrency:
+  group: supply-chain-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  FLUTTER_VERSION: "3.44.9" # see docs/CI.md "Pinned versions"
+  GITLEAKS_VERSION: "v8.30.1"
+  OSV_SCANNER_VERSION: "v2.5.1"
+
+jobs:
+  secret-scan:
+    name: Secret scan (gitleaks)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout (full history -- secrets can hide in old commits)
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+
+      - name: Set up Go
+        uses: actions/setup-go@44694675825211faa026b3c33043df3e48a5fa00 # v6.0.0
+        with:
+          # NOT go-version-file against the pinned sing-box tree here --
+          # gitleaks v8.30.1 requires go >=1.24.11, newer than the
+          # 1.24.7 that packages/vpn_core/native/singbox-go/go.mod pins
+          # (deliberately, to match sing-box's own go.mod -- see
+          # UPSTREAM_VERSION.md). gitleaks is an unrelated tool this job
+          # installs to scan the repo, not something built against the
+          # sing-box pin, so it gets its own, independently-current Go
+          # version instead of inheriting a pin that has nothing to do
+          # with it. Bump this independently of the sing-box pin when a
+          # future gitleaks release needs a newer minimum.
+          go-version: "1.27.0"
+
+      - name: Install gitleaks ${{ env.GITLEAKS_VERSION }}
+        run: go install "github.com/zricethezav/gitleaks/v8@${{ env.GITLEAKS_VERSION }}"
+
+      - name: gitleaks detect
+        run: |
+          gitleaks detect \
+            --source . \
+            --config .gitleaks.toml \
+            --redact \
+            --verbose \
+            --report-format json \
+            --report-path "$RUNNER_TEMP/gitleaks-report.json"
+
+      - name: Upload gitleaks report
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: gitleaks-report
+          path: ${{ runner.temp }}/gitleaks-report.json
+          if-no-files-found: ignore
+          retention-days: 30
+
+  lockfile-consistency:
+    name: Lockfile consistency
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Flutter ${{ env.FLUTTER_VERSION }}
+        uses: subosito/flutter-action@1508160852fb97248640997f7cfb38da241df0ba # v2.9.1
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+
+      - name: Set up Go
+        uses: actions/setup-go@44694675825211faa026b3c33043df3e48a5fa00 # v6.0.0
+        with:
+          go-version-file: packages/vpn_core/native/singbox-go/go.mod
+
+      - name: pubspec.lock matches pubspec.yaml (app)
+        # Verified by running pub get and diffing the lockfile, rather
+        # than a specific `--enforce-lockfile`-style flag, so this check
+        # doesn't depend on exactly which Dart SDK patch introduced (or
+        # didn't) that flag -- `git diff --exit-code` is unambiguous and
+        # was actually exercised in this project's own development
+        # session, unlike an unverified flag name.
+        #
+        # PUB_HOSTED_URL is pinned explicitly to match the host already
+        # recorded in the committed pubspec.lock (every package entry's
+        # `url:` field is https://pub.flutter-io.cn, a regional mirror --
+        # not pub.dev). A package's host is part of its lockfile identity
+        # to pub, not just a fetch location: pointing `dart pub get` at a
+        # different host than the one already locked forces a full
+        # re-resolution against that other host's registry state, which
+        # doesn't just rewrite `url:` fields -- it can genuinely pick
+        # different transitive dependency versions (observed on a real CI
+        # run: several packages, e.g. vector_graphics_compiler, resolved
+        # to newer versions once pointed at pub.dev instead of the mirror
+        # the lockfile was actually generated against). See docs/CI.md
+        # "Pinned versions" -- this step must match the host the
+        # committed lockfile actually used, not assume it was pub.dev.
+        env:
+          PUB_HOSTED_URL: https://pub.flutter-io.cn
+        run: |
+          dart pub get
+          git diff --exit-code -- pubspec.lock
+
+      - name: pubspec.lock matches pubspec.yaml (vpn_core)
+        # packages/vpn_core/pubspec.lock is now committed (generated with
+        # a real Flutter SDK matching FLUTTER_VERSION above -- see
+        # docs/CI.md "Known current-state gaps", which previously
+        # documented this as ungenerated) -- same real diff check as the
+        # app-level lockfile above, same mirror-host reasoning.
+        working-directory: packages/vpn_core
+        env:
+          PUB_HOSTED_URL: https://pub.flutter-io.cn
+        run: |
+          dart pub get
+          git diff --exit-code -- pubspec.lock
+
+      - name: go.sum matches go.mod (native/singbox-go)
+        working-directory: packages/vpn_core/native/singbox-go
+        run: |
+          go mod verify
+          go mod tidy -diff
+
+  license-inventory:
+    name: License / dependency inventory
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Flutter ${{ env.FLUTTER_VERSION }}
+        uses: subosito/flutter-action@1508160852fb97248640997f7cfb38da241df0ba # v2.9.1
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+
+      - name: Set up Go
+        uses: actions/setup-go@44694675825211faa026b3c33043df3e48a5fa00 # v6.0.0
+        with:
+          go-version-file: packages/vpn_core/native/singbox-go/go.mod
+
+      - name: flutter pub get (app + vpn_core)
+        run: |
+          flutter pub get
+          (cd packages/vpn_core && flutter pub get)
+
+      - name: Generate dependency manifest
+        # A resolved-version manifest, NOT full per-package license text
+        # -- fetching and verifying license text for ~150 pub packages +
+        # ~150 Go modules would need per-package network calls to
+        # pub.dev/module proxies for every run, which is the kind of
+        # heavyweight check this task's "lightweight" instruction argues
+        # against. This is a "what exactly did we resolve" record --
+        # exactly what's needed to answer "did a dependency change"
+        # between two runs, which is the actionable part of a license
+        # inventory in CI. See docs/CI.md "License inventory scope" for
+        # the documented gap and how to close it later.
+        run: |
+          {
+            echo "# Dependency manifest ($(date -u +%Y-%m-%dT%H:%M:%SZ))"
+            echo ""
+            echo "## Dart (app) -- pubspec.lock"
+            dart pub deps --style=compact
+            echo ""
+            echo "## Dart (vpn_core) -- packages/vpn_core/pubspec.lock"
+            (cd packages/vpn_core && dart pub deps --style=compact)
+            echo ""
+            echo "## Go (native/singbox-go) -- go.sum, pinned sing-box tree"
+            (cd packages/vpn_core/native/singbox-go && go list -m all)
+          } > "$RUNNER_TEMP/dependency-manifest.txt"
+          cat "$RUNNER_TEMP/dependency-manifest.txt" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload dependency manifest
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: dependency-manifest
+          path: ${{ runner.temp }}/dependency-manifest.txt
+          retention-days: 90
+
+  vulnerability-scan:
+    name: Known-vulnerability scan (OSV)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Flutter ${{ env.FLUTTER_VERSION }}
+        uses: subosito/flutter-action@1508160852fb97248640997f7cfb38da241df0ba # v2.9.1
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+
+      - name: Set up Go
+        uses: actions/setup-go@44694675825211faa026b3c33043df3e48a5fa00 # v6.0.0
+        with:
+          # NOT go-version-file against the pinned sing-box tree here --
+          # osv-scanner v2.5.1 requires go >=1.26.5, newer than the 1.24.7
+          # that packages/vpn_core/native/singbox-go/go.mod pins
+          # (deliberately, to match sing-box's own go.mod -- see
+          # UPSTREAM_VERSION.md). Same reasoning as secret-scan's Go setup
+          # above: osv-scanner is an unrelated tool this job installs to
+          # scan the repo, not something built against the sing-box pin.
+          go-version: "1.27.0"
+
+      - name: flutter pub get (app + vpn_core)
+        run: |
+          flutter pub get
+          (cd packages/vpn_core && flutter pub get)
+
+      - name: Install osv-scanner ${{ env.OSV_SCANNER_VERSION }}
+        run: go install "github.com/google/osv-scanner/v2/cmd/osv-scanner@${{ env.OSV_SCANNER_VERSION }}"
+
+      - name: osv-scanner (pubspec.lock x2, go.sum)
+        # NOT continue-on-error for pubspec.lock findings -- Dart deps are
+        # this project's own direct choice and currently scan clean.
+        #
+        # KNOWN CURRENT STATE for the Go tree specifically: as of this
+        # workflow being added, osv-scanner genuinely finds real, open
+        # CVEs in transitive dependencies of the PINNED sing-box v1.13.19
+        # module (golang.org/x/crypto, golang.org/x/net,
+        # google.golang.org/grpc -- see docs/CI.md "Known open findings"
+        # for the exact GHSA/OSV IDs and fixed versions). These are
+        # upstream sing-box's dependency choices, not this project's; per
+        # this task's "do not arbitrarily upgrade... dependencies"
+        # instruction, this workflow does not silently bump go.sum to
+        # paper over them -- that decision belongs with a deliberate pin
+        # upgrade (packages/vpn_core/UPSTREAM_VERSION.md "Upgrading the
+        # pin"), not a supply-chain CI job. So this step is allowed to
+        # fail without failing the job, but its findings are always
+        # uploaded and always visible in the job summary -- never
+        # silently swallowed.
+        run: |
+          osv-scanner scan source --recursive . --format table \
+            | tee "$RUNNER_TEMP/osv-report.txt"
+        continue-on-error: true
+
+      - name: Publish OSV findings to job summary
+        if: always()
+        run: |
+          {
+            echo "### OSV vulnerability scan"
+            echo ""
+            echo '```'
+            cat "$RUNNER_TEMP/osv-report.txt" 2>/dev/null || echo "(no report produced)"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload OSV report
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: osv-scanner-report
+          path: ${{ runner.temp }}/osv-report.txt
+          if-no-files-found: ignore
+          retention-days: 30

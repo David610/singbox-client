@@ -1,0 +1,56 @@
+{
+  "outbounds": [
+    {
+      "type": "vless",
+      "tag": "Reality",
+      "server": "vpn.singboxvpn.test.invalid",
+      "server_port": 8443,
+      "uuid": "9c7e12d1-64c3-46f2-9e21-d707f05c88d9",
+      "flow": "xtls-rprx-vision",
+      "tls": {
+        "enabled": true,
+        "server_name": "www.microsoft.com",
+        "utls": { "enabled": true, "fingerprint": "chrome" },
+        "reality": {
+          "enabled": true,
+          "public_key": "anIGqfcDa8ypMGtP6lcoc3Fu54p3gOWMl9LKvIjRx3w",
+          "short_id": "580686c710f58181"
+        }
+      }
+    },
+    {
+      "type": "hysteria2",
+      "tag": "Hysteria2",
+      "server": "vpn.singboxvpn.test.invalid",
+      "server_port": 8444,
+      "password": "test-h2-fake-password-000",
+      "tls": {
+        "enabled": true,
+        "server_name": "vpn.singboxvpn.test.invalid",
+        "insecure": false
+      },
+      "obfs": {
+        "type": "salamander",
+        "password": "test-salamander-fake-000"
+      }
+    },
+    {
+      "type": "urltest",
+      "tag": "auto",
+      "outbounds": ["Reality", "Hysteria2"],
+      "url": "https://www.gstatic.com/generate_204",
+      "interval": "1m"
+    },
+    {
+      "type": "selector",
+      "tag": "select",
+      "outbounds": ["Reality", "Hysteria2", "auto"],
+      "default": "Reality"
+    },
+    {
+      "type": "direct",
+      "tag": "direct"
+    }
+  ],
+  "route": { "final": "select" }
+}

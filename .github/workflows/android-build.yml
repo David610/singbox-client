@@ -1,0 +1,140 @@
+name: Android build
+
+# Builds a debug APK (always signable, no secrets needed) and a
+# release-configuration APK signed with a throwaway, freshly-generated,
+# non-secret CI keystore (proves the shrunk/optimized release build graph
+# actually compiles -- see docs/CI.md "Why a throwaway keystore, not
+# --no-shrink"). No store/distribution signing secrets are used or
+# required -- see docs/CI.md "Secrets required: NONE".
+#
+# KNOWN CURRENT STATE: expected to fail today at the Dart-compile step
+# inside `flutter build apk`, for the same pre-existing reasons as
+# pr-fast.yml's app analyze/test (docs/ARCHITECTURE.md §9). This job is
+# NOT marked continue-on-error, unlike the fast gate's app analyze/test:
+# a build is a binary pass/fail by nature (there's no "informational
+# build failure"), so it stays a real, currently-red required check. See
+# docs/CI.md for the plan to turn it green.
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+  workflow_call: # so .github/workflows/release.yml can gate a release on this job (debug-build smoke test, distinct from the real signed release build)
+
+concurrency:
+  group: android-build-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  FLUTTER_VERSION: "3.44.9" # see docs/CI.md "Pinned versions"
+  JAVA_VERSION: "17" # android/app/build.gradle.kts sourceCompatibility
+
+jobs:
+  android-build:
+    name: Build Android (debug + release-config, unsigned-equivalent)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up JDK ${{ env.JAVA_VERSION }}
+        uses: actions/setup-java@dded0888837ed1f317902acf8a20df0ad188d165 # v5.0.0
+        with:
+          distribution: temurin
+          java-version: ${{ env.JAVA_VERSION }}
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@40fd30fb8d7440372e1316f5d1809ec01dcd3699 # v4.0.1
+        # Installs cmdline-tools and accepts all standard SDK licenses.
+        # compileSdk 35 / buildTools 36.0.0 / NDK 28.2.13676358 (pinned in
+        # android/app/build.gradle.kts, unchanged by this workflow) are
+        # fetched by the Android Gradle Plugin's own auto-download during
+        # the build below, now that licenses are pre-accepted.
+
+      - name: Set up Flutter ${{ env.FLUTTER_VERSION }}
+        uses: subosito/flutter-action@1508160852fb97248640997f7cfb38da241df0ba # v2.9.1
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+
+      - name: Cache pub dependencies
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.pub-cache
+          key: pub-${{ runner.os }}-${{ hashFiles('pubspec.lock', 'packages/vpn_core/pubspec.lock') }}
+          restore-keys: pub-${{ runner.os }}-
+
+      - name: Cache Gradle
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: gradle-${{ runner.os }}-${{ hashFiles('android/gradle/wrapper/gradle-wrapper.properties', 'android/**/*.gradle*') }}
+          restore-keys: gradle-${{ runner.os }}-
+
+      - name: flutter clean (clean dependency resolution)
+        run: flutter clean
+
+      - name: flutter pub get
+        run: flutter pub get
+
+      - name: Build debug APK
+        run: flutter build apk --debug
+
+      - name: Generate throwaway CI-only release keystore (NOT a secret)
+        # A fresh, meaningless keystore generated on every run and never
+        # persisted anywhere -- not a secret, not reused, not suitable
+        # for distribution. Exists only so the *release* build type's
+        # shrink/optimize/signing-config graph in
+        # android/app/build.gradle.kts can actually execute in CI without
+        # the repo's real (absent, private) production signing key. See
+        # docs/CI.md "Why a throwaway keystore".
+        run: |
+          keytool -genkeypair -v \
+            -keystore "$RUNNER_TEMP/ci-release.keystore" \
+            -storepass ci-throwaway-not-a-secret \
+            -keypass ci-throwaway-not-a-secret \
+            -alias ci -keyalg RSA -keysize 2048 -validity 1 \
+            -dname "CN=CI Build,OU=CI,O=CI,L=CI,S=CI,C=US"
+          cat > android/key.properties <<EOF
+          storePassword.debug=ci-throwaway-not-a-secret
+          keyPassword.debug=ci-throwaway-not-a-secret
+          keyAlias.debug=ci
+          storeFile.debug=$RUNNER_TEMP/ci-release.keystore
+          storePassword.release=ci-throwaway-not-a-secret
+          keyPassword.release=ci-throwaway-not-a-secret
+          keyAlias.release=ci
+          storeFile.release=$RUNNER_TEMP/ci-release.keystore
+          EOF
+
+      - name: Build release-configuration APK (throwaway-signed)
+        run: flutter build apk --release
+
+      - name: Upload debug APK
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: app-debug-apk
+          path: build/app/outputs/flutter-apk/app-debug.apk
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Upload release-configuration APKs (throwaway-signed)
+        # android/app/build.gradle.kts enables per-ABI splits plus a
+        # universal APK, so this is a glob (app-armeabi-v7a-release.apk,
+        # app-arm64-v8a-release.apk, app-universal-release.apk), not one
+        # fixed filename.
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: app-release-config-apks-THROWAWAY-SIGNED
+          path: build/app/outputs/flutter-apk/*release*.apk
+          if-no-files-found: warn
+          retention-days: 14

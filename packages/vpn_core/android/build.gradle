@@ -1,0 +1,60 @@
+buildscript {
+    repositories {
+        google()
+        mavenCentral()
+    }
+    dependencies {
+        classpath("org.jetbrains.kotlin:kotlin-gradle-plugin:2.2.20")
+    }
+}
+
+plugins {
+    id("com.android.library")
+    id("kotlin-android")
+}
+
+// Gradle only allows buildscript {}, pluginManagement {}, and other
+// plugins {} blocks before a plugins {} block -- group/version
+// assignments have to come after it, not before.
+group = "app.singboxclient.vpn_core"
+version = "0.1.0"
+
+android {
+    namespace = "app.singboxclient.vpn_core"
+    compileSdk = 35
+
+    defaultConfig {
+        minSdk = 26
+    }
+
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
+    }
+    kotlinOptions {
+        jvmTarget = JavaVersion.VERSION_17.toString()
+    }
+
+    // The pinned sing-box/libbox core is NOT vendored as source in this
+    // repository (it is Go, built by the upstream sing-box build system).
+    // A developer produces libbox.aar locally by running
+    // packages/vpn_core/native/singbox-go/build_android.sh (documented in
+    // docs/BUILDING.md) and drops it here. Until that file exists, this
+    // module still compiles -- SingBoxVpnService.kt fails fast at runtime
+    // with a clear error instead of failing the build, so `flutter pub get`
+    // / `flutter analyze` / `flutter test` keep working without the core.
+    //
+    // See docs/ARCHITECTURE.md "Why libbox.aar isn't committed".
+}
+
+repositories {
+    google()
+    mavenCentral()
+}
+
+dependencies {
+    def libboxAar = file("libs/libbox.aar")
+    if (libboxAar.exists()) {
+        implementation(files(libboxAar))
+    }
+}

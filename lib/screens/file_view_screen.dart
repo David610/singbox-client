@@ -248,6 +248,7 @@ class _FileViewScreenState extends State<FileViewScreen> {
     );
   }
 }
+
 /*
 class ContextMenuControllerImpl implements SelectionToolbarController {
   bool readOnly = false;
