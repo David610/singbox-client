@@ -239,6 +239,21 @@ class SingBoxConfigBuilder {
   /// custom routing/DNS should build on top of this rather than modify it
   /// in place, so this method stays a single well-tested source of the
   /// "minimum viable tunnel config" shape.
+  ///
+  /// TUN addressing uses `option.TunInboundOptions.Address` (the unified
+  /// `address` field), NOT the legacy `inet4_address`/`inet6_address`
+  /// fields -- those are marked `// Deprecated: merged to Address` in
+  /// sing-box's own `option/tun.go` and are a HARD ERROR (not just a
+  /// warning) as of the pinned v1.13.19: `protocol/tun/inbound.go`
+  /// rejects any config carrying them with "legacy tun address fields are
+  /// deprecated in sing-box 1.10.0 and removed in sing-box 1.12.0". This
+  /// was verified against the pinned tag's actual source (see
+  /// packages/vpn_core/UPSTREAM_VERSION.md), not assumed from the
+  /// migration docs alone. The DNS server below similarly uses the
+  /// current `type`/`server` schema rather than the legacy
+  /// `tag`/`address` shorthand -- that one is only *deprecated* (not yet
+  /// removed) at v1.13.19, but avoiding it here means one fewer thing to
+  /// revisit when the pin eventually moves past v1.14.0.
   static String buildSingleOutboundDocument({
     required Map<String, Object?> outbound,
     bool udpEnabled = true,
@@ -251,7 +266,7 @@ class SingBoxConfigBuilder {
       'log': {'level': 'warn'},
       'dns': {
         'servers': [
-          {'tag': 'remote', 'address': 'tls://8.8.8.8'},
+          {'type': 'tls', 'tag': 'remote', 'server': '8.8.8.8'},
         ],
       },
       'inbounds': [
@@ -259,8 +274,7 @@ class SingBoxConfigBuilder {
           'type': 'tun',
           'tag': 'tun-in',
           'interface_name': tunInterfaceName,
-          'inet4_address': tunInet4Address,
-          'inet6_address': tunInet6Address,
+          'address': [...tunInet4Address, ...tunInet6Address],
           'mtu': 9000,
           'auto_route': true,
           'strict_route': true,
