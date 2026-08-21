@@ -52,7 +52,7 @@ permissions:
   contents: read
 
 env:
-  FLUTTER_VERSION: "3.35.7" # see docs/CI.md "Pinned versions"
+  FLUTTER_VERSION: "3.44.9" # see docs/CI.md "Pinned versions"
   ANDROID_PACKAGE_NAME: "com.nebula.karing" # android/app/build.gradle.kts applicationId -- update here post-rebrand, see docs/FORK_ARCHITECTURE_AUDIT.md §10
 
 jobs:

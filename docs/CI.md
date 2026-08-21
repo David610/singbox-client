@@ -20,8 +20,8 @@ chosen freely:
 
 | Tool | Pinned to | Source of truth |
 |---|---|---|
-| Flutter | `3.35.7` | Latest patch of the minor version `pubspec.yaml`'s `flutter: ">=3.35.0"` already declares as its floor. Not bumped to a newer minor (3.4x exists upstream but is NOT used here). |
-| Dart | bundled with the above Flutter release | `pubspec.yaml`: `sdk: ">=3.12.2 <4.0.0"` |
+| Flutter | `3.44.9` | See "Flutter version: a real correction" below — `pubspec.yaml`'s declared `flutter: ">=3.35.0"` floor turned out to be inconsistent with its own `sdk: ">=3.12.2 <4.0.0"` constraint; `3.44.9` is the actual earliest stable Flutter release whose bundled Dart SDK satisfies the latter, confirmed against Flutter's own release manifest. |
+| Dart | `3.12.2`, bundled with the above Flutter release | `pubspec.yaml`: `sdk: ">=3.12.2 <4.0.0"` |
 | JDK | 17 | `android/app/build.gradle.kts` `sourceCompatibility`/`targetCompatibility` |
 | Android compileSdk/buildTools/NDK | 35 / 36.0.0 / 28.2.13676358 | `android/app/build.gradle.kts` (unchanged by CI — fetched via AGP's own SDK auto-download once licenses are pre-accepted) |
 | Kotlin | 2.2.20 | `android/settings.gradle.kts` |
@@ -30,6 +30,63 @@ chosen freely:
 | CocoaPods | 1.16.2 | `ios/Podfile.lock` (`COCOAPODS:` line) |
 | Xcode | whatever `macos-latest` provides | **Not pinned in the repo today** — no `.xcode-version` file, no existing CI to preserve a prior pin from. This workflow does not invent one; see "iOS Xcode version" below. |
 | sing-box / libbox | `v1.13.19`, commit `b5ebaa1fc0f2b94256180b95468e73ef53caa27d` | `packages/vpn_core/UPSTREAM_VERSION.md` |
+
+### Flutter version: a real correction
+
+The original pin here was `3.35.7` — "the latest patch of the minor
+version `pubspec.yaml`'s `flutter: ">=3.35.0"` declares as its floor,"
+reasoned entirely from that one line and never actually run. The first
+real CI run of these workflows (PR #2) failed on **every** Flutter-based
+job with the same error:
+
+```
+The current Dart SDK version is 3.9.2.
+Because karing requires SDK version >=3.12.2 <4.0.0, version solving failed.
+```
+
+Flutter 3.35.7 bundles Dart 3.9.2 — which does not satisfy `pubspec.yaml`'s
+own `sdk: ">=3.12.2 <4.0.0"` constraint. The `flutter: ">=3.35.0"` floor
+and the `sdk: ">=3.12.2"` floor are simply inconsistent with each other as
+written; satisfying the Dart constraint (the one that actually blocks
+`pub get`) requires a materially newer Flutter than the declared floor
+alone would suggest.
+
+Corrected by checking Flutter's own release manifest
+(`https://storage.googleapis.com/flutter_infra_release/releases/releases_linux.json`)
+for the earliest stable release bundling Dart `>=3.12.2`:
+
+| Flutter | Dart SDK |
+|---|---|
+| 3.41.9 | 3.11.5 (still fails) |
+| 3.44.0 | 3.12.0 (still fails) |
+| **3.44.2** | **3.12.2 (first release that satisfies it)** |
+| 3.44.9 | 3.12.2 (latest patch on that line, released 2026-08-06) |
+| 3.47.1 | 3.13.1 (current latest stable overall) |
+
+`3.44.9` was chosen over `3.47.1` for the same "don't arbitrarily
+upgrade" reasoning as the original pin — it's the latest patch of the
+*earliest* Flutter minor that actually satisfies `pubspec.yaml`'s own
+constraint, not the newest Flutter available. All six workflow files'
+`FLUTTER_VERSION` were updated together (`pr-fast.yml`,
+`android-build.yml`, `ios-build.yml`, `singbox-vpn-compat.yml`,
+`supply-chain.yml`, `release.yml`).
+
+**Lesson recorded here on purpose**: a version pin reasoned about from a
+single declared floor, without cross-checking every other constraint that
+floor has to coexist with, is a guess wearing the shape of a fact. This
+one only got caught because the workflow actually ran — see
+`docs/release/RELEASE_CHECKLIST.md`'s own note about the iOS release path
+never having been run end to end, for another pin in this repo carrying
+exactly the same risk until it, too, is actually exercised.
+
+A second, independent bug surfaced in the same CI run:
+`supply-chain.yml`'s `secret-scan` job installed `gitleaks v8.30.1` using
+`go-version-file: packages/vpn_core/native/singbox-go/go.mod` (pinned to
+Go 1.24.7, matching sing-box's own requirement) — but gitleaks v8.30.1
+itself requires Go >=1.24.11. Fixed by giving that one step its own,
+independently-current Go version (`1.27.0`) instead of inheriting a pin
+that exists for an unrelated reason (reproducing the sing-box build, not
+running gitleaks) — see that job's inline comment.
 
 ### iOS Xcode version
 

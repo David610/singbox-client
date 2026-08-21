@@ -31,7 +31,7 @@ permissions:
   contents: read
 
 env:
-  FLUTTER_VERSION: "3.35.7" # see docs/CI.md "Pinned versions"
+  FLUTTER_VERSION: "3.44.9" # see docs/CI.md "Pinned versions"
   GITLEAKS_VERSION: "v8.30.1"
   OSV_SCANNER_VERSION: "v2.5.1"
 
@@ -48,7 +48,17 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@44694675825211faa026b3c33043df3e48a5fa00 # v6.0.0
         with:
-          go-version-file: packages/vpn_core/native/singbox-go/go.mod
+          # NOT go-version-file against the pinned sing-box tree here --
+          # gitleaks v8.30.1 requires go >=1.24.11, newer than the
+          # 1.24.7 that packages/vpn_core/native/singbox-go/go.mod pins
+          # (deliberately, to match sing-box's own go.mod -- see
+          # UPSTREAM_VERSION.md). gitleaks is an unrelated tool this job
+          # installs to scan the repo, not something built against the
+          # sing-box pin, so it gets its own, independently-current Go
+          # version instead of inheriting a pin that has nothing to do
+          # with it. Bump this independently of the sing-box pin when a
+          # future gitleaks release needs a newer minimum.
+          go-version: "1.27.0"
 
       - name: Install gitleaks ${{ env.GITLEAKS_VERSION }}
         run: go install "github.com/zricethezav/gitleaks/v8@${{ env.GITLEAKS_VERSION }}"

@@ -53,7 +53,7 @@ permissions:
   contents: read
 
 env:
-  FLUTTER_VERSION: "3.35.7" # see docs/CI.md "Pinned versions"
+  FLUTTER_VERSION: "3.44.9" # see docs/CI.md "Pinned versions"
   COCOAPODS_VERSION: "1.16.2" # pinned in ios/Podfile.lock ("COCOAPODS:")
 
 jobs:

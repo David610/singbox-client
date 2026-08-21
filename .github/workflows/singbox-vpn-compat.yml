@@ -40,7 +40,7 @@ permissions:
   contents: read
 
 env:
-  FLUTTER_VERSION: "3.35.7" # see docs/CI.md "Pinned versions"
+  FLUTTER_VERSION: "3.44.9" # see docs/CI.md "Pinned versions"
   # Must match packages/vpn_core/native/singbox-go/go.mod's `go` directive.
   GO_VERSION: "1.24.7"
   SING_BOX_PIN_TAG: "v1.13.19" # packages/vpn_core/UPSTREAM_VERSION.md

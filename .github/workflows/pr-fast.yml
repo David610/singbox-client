@@ -34,7 +34,7 @@ env:
   # Pinned to the exact latest patch of the minor version this repo's
   # pubspec.yaml already declares as its floor (`flutter: ">=3.35.0"`) --
   # not upgraded to a newer minor. See docs/CI.md "Pinned versions".
-  FLUTTER_VERSION: "3.35.7"
+  FLUTTER_VERSION: "3.44.9"
 
 jobs:
   format-analyze-test:
