@@ -45,11 +45,15 @@ Flutter app (lib/)
           │                               │
           ▼                               ▼
    SingBoxVpnService.kt                PacketTunnelProvider.swift
-   extends android.net.VpnService      extends NEPacketTunnelProvider
-   (packages/vpn_core/android/...)     (ios/vpnCoreService/...)
+   extends android.net.VpnService,     extends NEPacketTunnelProvider
+   implements VpnPlatformInterface-    (ios/vpnCoreService/...)
+   Wrapper (packages/vpn_core/android/...)
           │                               │
           ▼                               ▼
-   LibboxBridge.kt (reflection)        `import Libbox` (direct)
+   `import io.nekohasekai.libbox.*`    `import Libbox` (direct)
+   (direct; libbox.aar is a MANDATORY
+   Gradle build input as of §6 below
+   -- no reflection, no fallback)
           │                               │
           └───────────────┬───────────────┘
                            ▼
@@ -162,36 +166,114 @@ what it's for.)
 
 ## 6. Android path
 
+**This section describes the real, wired packet path** (as of this
+milestone), not an architecture-only skeleton. Every Go type/method name
+below was read directly from the pinned v1.13.19 source
+(`experimental/libbox/{command_server,platform,tun,setup}.go`), not
+assumed — see `packages/vpn_core/android/src/main/kotlin/app/singboxclient/vpn_core/`
+for the actual Kotlin, which is also cross-checked against
+SagerNet/sing-box-for-android's own integration of the same core (both
+its `stable`/1.12.23 and `main`/1.14.0-rc.1 branches — `main`'s shape is
+what actually matches this pin; `stable` predates a `FindConnectionOwner`
+signature change).
+
 ```
 Dart: VpnCore.start(config)
   -> MethodChannel('vpn_core/methods').invokeMethod('start', {tag, configJson})
   -> VpnCorePlugin.onMethodCall  (packages/vpn_core/android/.../VpnCorePlugin.kt)
        -> android.net.VpnService.prepare(context)   [system permission dialog if needed]
        -> SingBoxVpnService.start(context, tag, configJson)
+            -> Libbox.setup(SetupOptions{...})   [once per process]
             -> Intent(ACTION_START) -> SingBoxVpnService.onStartCommand
-                 -> LibboxBridge.checkConfig(configJson)   [libbox.CheckConfig, reflection]
-                 -> VpnService.Builder()
-                      .addAddress(...) .addRoute(0.0.0.0/0, ::/0)
-                      .addDisallowedApplication(packageName)
-                      .setMtu(9000) .setBlocking(false)
-                    .establish()  -> ParcelFileDescriptor
-                 -> startForeground(notification)   [required by Android for a long-running VpnService]
-                 -> publishStatus(CONNECTED)
+                 -> startForeground(notification: "Connecting...")   [main thread, promptly]
+                 -> executor.execute {   [single background thread -- see below]
+                      commandServer = CommandServer(VpnCommandServerHandler(this), this)
+                      commandServer.startOrReloadService(configJson, OverrideOptions())
+                        -- synchronous; throws on ANY real failure (bad
+                           config, listen failure, tun rejection, ...).
+                           Internally, on this same call stack, sing-box's
+                           tun inbound calls back into
+                           SingBoxVpnService.openTun(options: TunOptions):
+                             VpnService.Builder()
+                               .addAddress(...)      [from options.inet4Address/inet6Address]
+                               .addRoute(...)        [from options.inet{4,6}RouteAddress, or 0.0.0.0/0 :: /0 if unset]
+                               .addDnsServer(...)    [from options.dnsServerAddress]
+                               .setMtu(options.mtu)
+                             .establish() -> ParcelFileDescriptor
+                      -- only reached if startOrReloadService did NOT throw:
+                      publishStatus(CONNECTED)
+                    }
 ```
+
+Socket protection (**"protect underlying outbound sockets from the VPN
+loop"**): `SingBoxVpnService.autoDetectInterfaceControl(fd)` calls
+`VpnService.protect(fd)`. This is wired into every outbound socket the
+router creates when `route.auto_detect_interface: true` (which
+`SingBoxConfigBuilder.buildSingleOutboundDocument` always sets) via
+`route/network.go`'s dialer-control chain in the pinned source — verified
+by reading that call site, not assumed from the interface shape alone.
 
 UDP: `Builder` doesn't need explicit UDP enabling — a `VpnService` TUN
 carries both TCP and UDP once established; UDP support is controlled at
 the sing-box config level (`udp_timeout` on the `tun` inbound — see
 `SingBoxConfigBuilder.buildSingleOutboundDocument`'s `udpEnabled` param,
-tested).
+tested). IPv4 and IPv6 are both applied unconditionally (`options.inet4Address`
+and `options.inet6Address` are always both read and both added to the
+`Builder`, matching the config's own dual-stack `172.19.0.1/28`/
+`fdfe:dcba:9876::1/126` tun addresses).
 
-**Not yet wired**: the established `ParcelFileDescriptor` is not yet handed
-to libbox's `PlatformInterface.OpenTun` / `CommandServer` — see §7.
+**Threading**: all libbox calls (`startOrReloadService`/`closeService`/
+`close`, all blocking Go calls) run on a single-thread `ExecutorService`,
+never Android's main thread. `openTun`/`autoDetectInterfaceControl` are
+themselves invoked BY libbox FROM that executor thread (synchronously,
+within `startOrReloadService`'s call stack) — `VpnService.Builder.establish()`
+and `.protect()` are documented safe to call off the main thread. State
+publishing crosses back to the main thread via a `Handler(Looper.getMainLooper())`,
+required by Flutter's `EventChannel.EventSink` contract.
+
+**State machine** (`VpnLifecycleState.kt`, unit-tested in
+`src/test/kotlin/.../VpnLifecycleStateTest.kt` — no Android/libbox
+dependency, runs on the plain JVM): `CONNECTED` is reachable only via
+`CONNECTING -> (startOrReloadService succeeds) -> CONNECTED`; any thrown
+exception takes `CONNECTING -> INVALID` instead, never `CONNECTED`. A
+second `start()` while one is already `CONNECTING`/a stop is
+`DISCONNECTING` is rejected outright (not raced); `start()` while already
+`CONNECTED` is treated as a reload (matching `VpnCorePlugin.restart`,
+which is a plain `start()` — libbox's own `StartOrReloadService` closes
+the prior instance internally, so the existing `CommandServer` is reused,
+never leaked). `stop()` while already `DISCONNECTED`/`INVALID` is a
+harmless no-op. `stop()` (`ACTION_STOP`, `onRevoke`) always runs
+`closeService()` -> `close()` on the `CommandServer`, closes the TUN
+`ParcelFileDescriptor`, removes the foreground notification, and publishes
+`DISCONNECTED` — repeatable indefinitely (verified by
+`SingBoxVpnServiceInstrumentedTest.repeatedStartStopIsIdempotentAndAlwaysSettles`,
+see the caveat below on what running that test actually requires).
+
+**Missing `libbox.aar` is now a hard Gradle build failure, not a runtime
+fallback** (`packages/vpn_core/android/build.gradle`) — a deliberate
+policy change from the prior milestone's reflection-based
+`LibboxBridge.kt` (deleted this milestone). There is no code path left
+that could compile and then silently "succeed" at connecting without a
+real core.
 
 Real, verified Android facts used above: `minSdk = 26`, `compileSdk = 35`,
 Kotlin `2.2.20`, Gradle `8.14.3`, JDK 17 (all read from the existing
 `android/app/build.gradle.kts` and `android/gradle/wrapper/gradle-wrapper.properties`
 in this repo — unchanged by this milestone).
+
+**Honest verification caveat**: this environment has no Android
+device/emulator and no Android NDK, so `libbox.aar` was never actually
+built here and none of the above was compiled or run against the real
+generated Java bindings. Every method name and signature was read
+directly from the pinned Go source and cross-checked against upstream's
+own real, building, running Android client at the same architecture
+generation — not guessed — but "read the source and a proven reference
+correctly" is not the same claim as "compiled and ran it." The concrete
+next step is exactly that: build `libbox.aar`
+(`packages/vpn_core/native/singbox-go/build_android.sh`, needs the
+Android NDK) and run `SingBoxVpnServiceInstrumentedTest` plus the manual
+device acceptance checklist in `docs/DEVICE_ACCEPTANCE.md` on real
+hardware against a real `singbox-vpn` server.
 
 ## 7. iOS path
 
@@ -279,15 +361,16 @@ in-repo `vpn_core` package with a correct `VpnService`/
 deliver a fully working tunnel, and does **not** yet make the whole `lib/`
 tree compile. Specifically, in priority order:
 
-1. **Packet-loop wiring (P0 for a working tunnel).** Android:
-   `SingBoxVpnService`'s `ParcelFileDescriptor` is not yet handed to
-   libbox's `CommandServer`/`PlatformInterface.OpenTun`. iOS:
-   `LibboxPlatformInterface.openTun` establishes the OS-level tunnel
-   settings but doesn't yet run the `NEPacketTunnelFlow` read/write loop.
-   Until this lands, the VPN permission flow, TUN establishment, and
-   config validation are real and working, but no traffic flows. This is
-   the direct next implementation task — see `docs/BUILDING.md` "Next
-   implementation task".
+1. **Packet-loop wiring (P0 for a working tunnel) — DONE for Android,
+   STILL OPEN for iOS.** Android: `SingBoxVpnService` now implements
+   `PlatformInterface` directly and drives the real `CommandServer.startOrReloadService`
+   lifecycle — see §6 for the full, real call chain and its honest
+   verification caveat (no device/NDK in this environment to actually
+   build `libbox.aar` and run it). iOS: `LibboxPlatformInterface.openTun`
+   still only establishes the OS-level tunnel settings and doesn't yet
+   run the `NEPacketTunnelFlow` read/write loop — this remains the
+   direct next implementation task for iOS specifically. See
+   `docs/BUILDING.md` "Next implementation task".
 
 2. **`lib/app/utils/` was ALSO entirely missing (P0) — since reconstructed,
    for real, one file at a time, from call-site usage; see below for what
@@ -411,7 +494,15 @@ architectures), not source — committing them would mean trusting a binary
 blob nobody can review or diff, exactly the "unaudited third-party binary"
 risk this milestone is trying to move away from. Instead:
 `native/singbox-go/build_android.sh`/`build_ios.sh` reproduce them
-deterministically from the pinned, hash-verified source on demand (§5),
-and `SingBoxVpnService`'s reflection boundary (`LibboxBridge.kt`) lets the
-rest of the Android module compile and its tests pass even before a
-developer has run that step — see `docs/BUILDING.md`.
+deterministically from the pinned, hash-verified source on demand (§5).
+
+Unlike the prior milestone, `packages/vpn_core/android`'s Gradle build no
+longer compiles without `libbox.aar` present (see §6, "Missing `libbox.aar`
+is now a hard Gradle build failure") — the old reflection boundary
+(`LibboxBridge.kt`, deleted) that let the module compile regardless is
+gone by design: a Kotlin service that links against the real core
+directly cannot also silently compile into something that claims to
+connect without it. `flutter pub get`/`flutter analyze`/`flutter test` at
+the Dart level are unaffected (they never invoke this module's Gradle
+build); only an actual Android build/release now requires the AAR to
+exist first — see `docs/BUILDING.md`.
