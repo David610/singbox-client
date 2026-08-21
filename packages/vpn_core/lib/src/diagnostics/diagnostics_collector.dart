@@ -78,6 +78,7 @@ class DiagnosticsCollector {
   DateTime? _connectedSince;
   int _reconnectCount = 0;
   VpnCoreState? _lastObservedState;
+  bool _hasConnectedOnce = false;
   String? _publicIpBaseline;
 
   /// Captures "public IP before" -- call this explicitly BEFORE
@@ -96,9 +97,15 @@ class DiagnosticsCollector {
 
   void _onStatus(VpnCoreStatus status) {
     if (status.state == VpnCoreState.connected) {
-      if (_lastObservedState != null &&
-          _lastObservedState != VpnCoreState.connected) {
-        _reconnectCount++;
+      if (_lastObservedState != VpnCoreState.connected) {
+        // Only a transition into `connected` after having been connected
+        // at least once before counts as a *re*-connection -- the very
+        // first connect (typically preceded by `connecting`, not another
+        // `connected`) must not bump this counter.
+        if (_hasConnectedOnce) {
+          _reconnectCount++;
+        }
+        _hasConnectedOnce = true;
       }
       _connectedSince ??= DateTime.now();
     } else {

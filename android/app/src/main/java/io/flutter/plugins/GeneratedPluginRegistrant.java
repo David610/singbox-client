@@ -146,9 +146,9 @@ public final class GeneratedPluginRegistrant {
       Log.e(TAG, "Error registering plugin url_launcher_android, io.flutter.plugins.urllauncher.UrlLauncherPlugin", e);
     }
     try {
-      flutterEngine.getPlugins().add(new io.nebula.vpn_service.VpnServicePlugin());
+      flutterEngine.getPlugins().add(new app.singboxclient.vpn_core.VpnCorePlugin());
     } catch (Exception e) {
-      Log.e(TAG, "Error registering plugin vpn_service, io.nebula.vpn_service.VpnServicePlugin", e);
+      Log.e(TAG, "Error registering plugin vpn_core, app.singboxclient.vpn_core.VpnCorePlugin", e);
     }
   }
 }

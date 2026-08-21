@@ -20,28 +20,40 @@
 ///      passwords are both this shape), gets masked wherever it appears.
 library;
 
-final _keyValuePatterns = <RegExp>[
-  // "key": "value"  or  "key":"value"  (JSON)
-  RegExp(
-    r'"(uuid|password|public_key|publicKey|pbk|short_id|shortId|sid|'
-    r'obfs.?password|obfsPassword|token|secret|private_key|privateKey|'
-    r'subscription.?token|subscriptionToken|auth.?token|authToken)"'
-    r'\s*:\s*"([^"]*)"',
-    caseSensitive: false,
-  ),
-  // key=value  (query string / URI, e.g. vless://...&pbk=...&sid=...)
-  RegExp(
-    r'\b(uuid|password|pbk|sid|obfs-password|token|secret)=([^&\s#]+)',
-    caseSensitive: false,
-  ),
-  // key: value  (plain log lines)
-  RegExp(
-    r'\b(uuid|password|public_key|pbk|short_id|sid|obfs.?password|token|'
-    r'secret|private_key|subscription.?token|auth.?token)\s*:\s*'
-    r'([^\s,}]+)',
-    caseSensitive: false,
-  ),
-];
+// "key": "value"  or  "key":"value"  (JSON)
+final _jsonKeyValuePattern = RegExp(
+  r'"(uuid|password|public_key|publicKey|pbk|short_id|shortId|sid|'
+  r'obfs.?password|obfsPassword|token|secret|private_key|privateKey|'
+  r'subscription.?token|subscriptionToken|auth.?token|authToken)"'
+  r'\s*:\s*"([^"]*)"',
+  caseSensitive: false,
+);
+
+// key=value  (query string / URI, e.g. vless://...&pbk=...&sid=...)
+//
+// The value class excludes `"` as well as the query-string delimiters --
+// this pattern also has to match a key=value pair sitting inside an
+// already-JSON-encoded string (e.g. a raw engine-log line smuggled into
+// a JSON field), and without excluding `"` a value ending right at the
+// JSON string's closing quote greedily consumes that quote into an
+// unused capture group, silently dropping it from the (quote-discarding)
+// replacement and corrupting the JSON. See redactText's doc comment.
+final _queryKeyValuePattern = RegExp(
+  r'\b(uuid|password|pbk|sid|obfs-password|token|secret)=([^&\s#"]+)',
+  caseSensitive: false,
+);
+
+// key: value  (plain log lines)
+//
+// Same `"`-exclusion reasoning as _queryKeyValuePattern above -- this
+// also needs to not swallow a JSON string's closing quote when a raw
+// log-line-shaped value happens to sit at the end of one.
+final _logLineKeyValuePattern = RegExp(
+  r'\b(uuid|password|public_key|pbk|short_id|sid|obfs.?password|token|'
+  r'secret|private_key|subscription.?token|auth.?token)\s*:\s*'
+  r'([^\s,}"]+)',
+  caseSensitive: false,
+);
 
 /// Standalone UUID (e.g. a VLESS UUID appearing with no surrounding
 /// "uuid=" context that pattern (1) above would have caught).
@@ -74,21 +86,30 @@ const _redactedPlaceholder = '[REDACTED]';
 /// Idempotent: `redactText(redactText(x)) == redactText(x)`.
 String redactText(String input) {
   var out = input;
-  for (final pattern in _keyValuePatterns) {
-    out = out.replaceAllMapped(
-      pattern,
-      (m) => '${m.group(1)}${_separatorFor(m.group(0)!)}$_redactedPlaceholder',
-    );
-  }
+  // Each pattern gets its own replacement so the matched shape's
+  // delimiters (quotes for JSON, bare `=`/`: ` otherwise) are rebuilt
+  // explicitly rather than guessed from the matched text -- a shared
+  // guess-the-separator helper here previously dropped the JSON pattern's
+  // surrounding quotes entirely, corrupting otherwise-valid JSON while
+  // still satisfying `contains([REDACTED])`-only assertions. See
+  // diagnostics_exporter_test.dart's "is valid, parseable JSON after
+  // redaction" -- the actual regression-catching test for this class of
+  // bug, which a `contains` check alone cannot catch.
+  out = out.replaceAllMapped(
+    _jsonKeyValuePattern,
+    (m) => '"${m.group(1)}": "$_redactedPlaceholder"',
+  );
+  out = out.replaceAllMapped(
+    _queryKeyValuePattern,
+    (m) => '${m.group(1)}=$_redactedPlaceholder',
+  );
+  out = out.replaceAllMapped(
+    _logLineKeyValuePattern,
+    (m) => '${m.group(1)}: $_redactedPlaceholder',
+  );
   out = out.replaceAll(_uuidPattern, _redactedPlaceholder);
   out = out.replaceAll(_longTokenPattern, _redactedPlaceholder);
   return out;
-}
-
-String _separatorFor(String matchedText) {
-  if (matchedText.contains('":')) return '": "';
-  if (matchedText.contains('=')) return '=';
-  return ': ';
 }
 
 /// Shows only the last [visible] characters of a credential, for cases

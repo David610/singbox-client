@@ -2228,13 +2228,13 @@ packages:
       url: "https://pub.flutter-io.cn"
     source: hosted
     version: "15.2.0"
-  vpn_service:
+  vpn_core:
     dependency: "direct main"
     description:
-      path: "../vpn-service"
+      path: "packages/vpn_core"
       relative: true
     source: path
-    version: "0.12.15"
+    version: "0.1.0"
   watcher:
     dependency: "direct main"
     description:

@@ -130,24 +130,16 @@ jobs:
           git diff --exit-code -- pubspec.lock
 
       - name: pubspec.lock matches pubspec.yaml (vpn_core)
-        # packages/vpn_core/pubspec.lock is not committed yet -- it could
-        # not be generated in the environment that built this package
-        # (no Flutter/Dart SDK available there; see docs/BUILDING.md
-        # "What could not be verified in this environment"). Rather than
-        # a `git diff` that would silently pass on an untracked file
-        # (masking the gap instead of flagging it), this fails loudly
-        # with an actionable message until someone with a real Flutter
-        # SDK generates and commits it -- see docs/CI.md "Known
-        # current-state gaps".
+        # packages/vpn_core/pubspec.lock is now committed (generated with
+        # a real Flutter SDK matching FLUTTER_VERSION above -- see
+        # docs/CI.md "Known current-state gaps", which previously
+        # documented this as ungenerated) -- same real diff check as the
+        # app-level lockfile above, same mirror-host reasoning.
         working-directory: packages/vpn_core
         env:
-          PUB_HOSTED_URL: https://pub.dev
+          PUB_HOSTED_URL: https://pub.flutter-io.cn
         run: |
           dart pub get
-          if ! git ls-files --error-unmatch pubspec.lock > /dev/null 2>&1; then
-            echo "::error::packages/vpn_core/pubspec.lock is not committed -- generate it with 'flutter pub get' on a machine with the Flutter SDK and commit it, then this check will diff it for real. See docs/CI.md 'Known current-state gaps'."
-            exit 1
-          fi
           git diff --exit-code -- pubspec.lock
 
       - name: go.sum matches go.mod (native/singbox-go)
