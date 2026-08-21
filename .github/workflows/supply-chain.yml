@@ -109,17 +109,22 @@ jobs:
         # was actually exercised in this project's own development
         # session, unlike an unverified flag name.
         #
-        # PUB_HOSTED_URL is pinned explicitly to the real pub.dev host --
-        # some runner/network environments default `dart pub get` to a
-        # regional mirror (e.g. pub.flutter-io.cn), which resolves the
-        # exact same package versions but writes a different `url:` field
-        # into each package entry in pubspec.lock. That produced a false
-        # failure here (a mirror-host-only diff, not a real staleness
-        # diff) -- see docs/CI.md "Pinned versions". The committed
-        # pubspec.lock was generated against pub.dev, so this step must
-        # match that, not whatever the runner happens to default to.
+        # PUB_HOSTED_URL is pinned explicitly to match the host already
+        # recorded in the committed pubspec.lock (every package entry's
+        # `url:` field is https://pub.flutter-io.cn, a regional mirror --
+        # not pub.dev). A package's host is part of its lockfile identity
+        # to pub, not just a fetch location: pointing `dart pub get` at a
+        # different host than the one already locked forces a full
+        # re-resolution against that other host's registry state, which
+        # doesn't just rewrite `url:` fields -- it can genuinely pick
+        # different transitive dependency versions (observed on a real CI
+        # run: several packages, e.g. vector_graphics_compiler, resolved
+        # to newer versions once pointed at pub.dev instead of the mirror
+        # the lockfile was actually generated against). See docs/CI.md
+        # "Pinned versions" -- this step must match the host the
+        # committed lockfile actually used, not assume it was pub.dev.
         env:
-          PUB_HOSTED_URL: https://pub.dev
+          PUB_HOSTED_URL: https://pub.flutter-io.cn
         run: |
           dart pub get
           git diff --exit-code -- pubspec.lock

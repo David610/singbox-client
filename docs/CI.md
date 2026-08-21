@@ -96,13 +96,24 @@ A third, same-shaped bug was in the same file's `vulnerability-scan` job:
 
 A fourth bug, unrelated to Go versions: `lockfile-consistency`'s
 "pubspec.lock matches pubspec.yaml (app)" step failed with a diff limited
-to the `url:` field of one package (`zxing2`) — `pub.dev` in the committed
-lockfile vs. `pub.flutter-io.cn` (a regional mirror) in what `dart pub
-get` produced on the runner. Same resolved versions, different mirror
-host recorded in the lock. Fixed by pinning `PUB_HOSTED_URL: https://pub.dev`
-on both `dart pub get` steps in that job, so the check always regenerates
-against the same host the committed lockfile was generated against,
-rather than depending on whatever mirror a given runner defaults to.
+to the `url:` field of one package (`zxing2`) — `pub.flutter-io.cn` (the
+host actually recorded in every package entry of the committed
+`pubspec.lock`) vs. `pub.dev` in what `dart pub get` produced on the
+runner. First fix attempt pinned `PUB_HOSTED_URL: https://pub.dev`,
+reasoning backwards — that the committed lockfile was pub.dev and the
+runner had drifted to the mirror. It was the other way around: the
+committed lockfile is 100% `pub.flutter-io.cn` (`grep -c pub.flutter-io.cn
+pubspec.lock` → 282, `pub.dev` → 0). Forcing `pub.dev` made the check
+*fail differently* on the next run: a package's host is part of its
+lockfile identity to `dart pub`, so pointing at a different host than the
+one already locked forces a full re-resolution against that host's
+current registry state — not just a `url:` rewrite. That re-resolution
+picked several genuinely different transitive versions (e.g.
+`vector_graphics_compiler` 1.2.6 → 1.3.0, `vm_service` 15.2.0 → 15.3.0),
+which then failed the diff for real reasons instead of a mirror-only one.
+Corrected to `PUB_HOSTED_URL: https://pub.flutter-io.cn` — matching the
+host the lockfile was actually generated against, verified by grepping
+the committed file rather than assumed.
 
 A fifth bug: `dart format --output=none --set-exit-if-changed .` flagged
 21 files as unformatted. These were genuinely never run through a real
