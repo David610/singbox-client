@@ -87,10 +87,9 @@ class MethodChannelVpnCore extends VpnCorePlatform {
   @override
   Future<List<String>> getSanitizedLogs({int maxLines = 200}) async {
     try {
-      final lines = await _method.invokeListMethod<String>(
-        'getSanitizedLogs',
-        {'maxLines': maxLines},
-      );
+      final lines = await _method.invokeListMethod<String>('getSanitizedLogs', {
+        'maxLines': maxLines,
+      });
       return lines ?? const [];
     } on PlatformException catch (e) {
       throw VpnCoreException(e.code, e.message ?? 'getSanitizedLogs failed');

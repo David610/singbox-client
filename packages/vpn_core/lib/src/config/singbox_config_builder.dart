@@ -227,9 +227,7 @@ class SingBoxConfigBuilder {
       server: parsed.host,
       serverPort: parsed.port,
       password: password,
-      salamanderPassword: obfsType == 'salamander'
-          ? q['obfs-password']
-          : null,
+      salamanderPassword: obfsType == 'salamander' ? q['obfs-password'] : null,
       sni: q['sni'],
       insecure: insecureRaw == '1' || insecureRaw == 'true',
     );

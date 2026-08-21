@@ -74,7 +74,9 @@ void main() {
     expect(allText, contains('vpn.singboxvpn.test.invalid'));
   });
 
-  testWidgets('never renders the raw VLESS UUID anywhere on screen', (tester) async {
+  testWidgets('never renders the raw VLESS UUID anywhere on screen', (
+    tester,
+  ) async {
     await tester.pumpWidget(
       const MaterialApp(
         home: DiagnosticsScreen(
@@ -88,7 +90,11 @@ void main() {
     final allText = tester
         .widgetList<Text>(find.byType(Text))
         .map((w) => w.data ?? '')
-        .followedBy(tester.widgetList<SelectableText>(find.byType(SelectableText)).map((w) => w.data ?? ''))
+        .followedBy(
+          tester
+              .widgetList<SelectableText>(find.byType(SelectableText))
+              .map((w) => w.data ?? ''),
+        )
         .join('\n');
 
     expect(allText.contains('9c7e12d1-64c3-46f2-9e21-d707f05c88d9'), isFalse);
@@ -96,7 +102,9 @@ void main() {
     expect(allText.contains('88d9'), isTrue);
   });
 
-  testWidgets('the last engine error shown on screen is redacted', (tester) async {
+  testWidgets('the last engine error shown on screen is redacted', (
+    tester,
+  ) async {
     await tester.pumpWidget(
       const MaterialApp(
         home: DiagnosticsScreen(serverHostname: 'vpn.singboxvpn.test.invalid'),
@@ -109,10 +117,15 @@ void main() {
         .map((w) => w.data ?? '')
         .join('\n');
     expect(allText.contains('9c7e12d1-64c3-46f2-9e21-d707f05c88d9'), isFalse);
-    expect(allText.contains('anIGqfcDa8ypMGtP6lcoc3Fu54p3gOWMl9LKvIjRx3w'), isFalse);
+    expect(
+      allText.contains('anIGqfcDa8ypMGtP6lcoc3Fu54p3gOWMl9LKvIjRx3w'),
+      isFalse,
+    );
   });
 
-  testWidgets('export dialog text never contains the raw UUID or REALITY key', (tester) async {
+  testWidgets('export dialog text never contains the raw UUID or REALITY key', (
+    tester,
+  ) async {
     await tester.pumpWidget(
       const MaterialApp(
         home: DiagnosticsScreen(
@@ -130,8 +143,14 @@ void main() {
         .widgetList<SelectableText>(find.byType(SelectableText))
         .map((w) => w.data ?? '')
         .join('\n');
-    expect(dialogText.contains('9c7e12d1-64c3-46f2-9e21-d707f05c88d9'), isFalse);
-    expect(dialogText.contains('anIGqfcDa8ypMGtP6lcoc3Fu54p3gOWMl9LKvIjRx3w'), isFalse);
+    expect(
+      dialogText.contains('9c7e12d1-64c3-46f2-9e21-d707f05c88d9'),
+      isFalse,
+    );
+    expect(
+      dialogText.contains('anIGqfcDa8ypMGtP6lcoc3Fu54p3gOWMl9LKvIjRx3w'),
+      isFalse,
+    );
     expect(dialogText, contains('singbox-client diagnostics'));
   });
 }

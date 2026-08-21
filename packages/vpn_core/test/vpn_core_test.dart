@@ -28,7 +28,10 @@ class _FakeVpnCorePlatform extends VpnCorePlatform {
   Future<void> start(VpnCoreConfig config) async {
     if (failWith != null) throw failWith!;
     if (!initialized) {
-      throw const VpnCoreException('not_initialized', 'call initialize() first');
+      throw const VpnCoreException(
+        'not_initialized',
+        'call initialize() first',
+      );
     }
     lastConfig = config;
     emit(VpnCoreStatus(state: VpnCoreState.connected, activeTag: config.tag));
@@ -55,8 +58,9 @@ class _FakeVpnCorePlatform extends VpnCorePlatform {
   Future<String> coreVersion() async => '1.13.19';
 
   @override
-  Future<List<String>> getSanitizedLogs({int maxLines = 200}) async =>
-      const ['[info] fake log line'];
+  Future<List<String>> getSanitizedLogs({int maxLines = 200}) async => const [
+    '[info] fake log line',
+  ];
 }
 
 void main() {
@@ -113,7 +117,9 @@ void main() {
   test('statusStream broadcasts state transitions', () async {
     await VpnCore.instance.initialize();
     final states = <VpnCoreState>[];
-    final sub = VpnCore.instance.statusStream().listen((s) => states.add(s.state));
+    final sub = VpnCore.instance.statusStream().listen(
+      (s) => states.add(s.state),
+    );
 
     await VpnCore.instance.start(
       VpnCoreConfig(tag: 't', singBoxConfigJson: '{}'),
@@ -137,14 +143,26 @@ void main() {
     }
   });
 
-  test('a platform failure surfaces as VpnCoreException, not a raw error', () async {
-    await VpnCore.instance.initialize();
-    fake.failWith = const VpnCoreException('permission_denied', 'user declined VPN prompt');
-    await expectLater(
-      VpnCore.instance.start(VpnCoreConfig(tag: 't', singBoxConfigJson: '{}')),
-      throwsA(
-        isA<VpnCoreException>().having((e) => e.code, 'code', 'permission_denied'),
-      ),
-    );
-  });
+  test(
+    'a platform failure surfaces as VpnCoreException, not a raw error',
+    () async {
+      await VpnCore.instance.initialize();
+      fake.failWith = const VpnCoreException(
+        'permission_denied',
+        'user declined VPN prompt',
+      );
+      await expectLater(
+        VpnCore.instance.start(
+          VpnCoreConfig(tag: 't', singBoxConfigJson: '{}'),
+        ),
+        throwsA(
+          isA<VpnCoreException>().having(
+            (e) => e.code,
+            'code',
+            'permission_denied',
+          ),
+        ),
+      );
+    },
+  );
 }

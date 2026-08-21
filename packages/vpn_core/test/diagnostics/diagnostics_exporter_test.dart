@@ -22,7 +22,9 @@ DiagnosticsSnapshot _snapshotWithLeakAttempt() {
     dns: ProbeResult.pass(latency: const Duration(milliseconds: 12)),
     tcp: ProbeResult.pass(latency: const Duration(milliseconds: 38)),
     udp: ProbeResult.pass(latency: const Duration(milliseconds: 15)),
-    quicHeuristic: ProbeResult.pass(detail: 'UDP/443 send accepted (heuristic only)'),
+    quicHeuristic: ProbeResult.pass(
+      detail: 'UDP/443 send accepted (heuristic only)',
+    ),
     approximateLatency: const Duration(milliseconds: 38),
     tunnelUptime: const Duration(minutes: 5, seconds: 12),
     reconnectCount: 1,
@@ -50,11 +52,17 @@ void main() {
       expect(json, contains('reconnectCount'));
     });
 
-    test('never contains a credential, even one smuggled into lastEngineError', () {
-      final json = exporter.exportJson(_snapshotWithLeakAttempt());
-      expect(json.contains('9c7e12d1-64c3-46f2-9e21-d707f05c88d9'), isFalse);
-      expect(json.contains('anIGqfcDa8ypMGtP6lcoc3Fu54p3gOWMl9LKvIjRx3w'), isFalse);
-    });
+    test(
+      'never contains a credential, even one smuggled into lastEngineError',
+      () {
+        final json = exporter.exportJson(_snapshotWithLeakAttempt());
+        expect(json.contains('9c7e12d1-64c3-46f2-9e21-d707f05c88d9'), isFalse);
+        expect(
+          json.contains('anIGqfcDa8ypMGtP6lcoc3Fu54p3gOWMl9LKvIjRx3w'),
+          isFalse,
+        );
+      },
+    );
 
     test('is valid, parseable JSON after redaction', () {
       // Proves the whole-bundle redaction pass (string substitution)
@@ -75,11 +83,17 @@ void main() {
       expect(text, contains('reconnect count: 1'));
     });
 
-    test('never contains a credential, even one smuggled into lastEngineError', () {
-      final text = exporter.exportText(_snapshotWithLeakAttempt());
-      expect(text.contains('9c7e12d1-64c3-46f2-9e21-d707f05c88d9'), isFalse);
-      expect(text.contains('anIGqfcDa8ypMGtP6lcoc3Fu54p3gOWMl9LKvIjRx3w'), isFalse);
-    });
+    test(
+      'never contains a credential, even one smuggled into lastEngineError',
+      () {
+        final text = exporter.exportText(_snapshotWithLeakAttempt());
+        expect(text.contains('9c7e12d1-64c3-46f2-9e21-d707f05c88d9'), isFalse);
+        expect(
+          text.contains('anIGqfcDa8ypMGtP6lcoc3Fu54p3gOWMl9LKvIjRx3w'),
+          isFalse,
+        );
+      },
+    );
 
     test('formats tunnel uptime as h/m/s', () {
       final text = exporter.exportText(_snapshotWithLeakAttempt());
@@ -102,7 +116,10 @@ void main() {
         quicHeuristic: ProbeResult.unknown,
         reconnectCount: 0,
       );
-      expect(exporter.exportText(snap), contains('tunnel uptime: not connected'));
+      expect(
+        exporter.exportText(snap),
+        contains('tunnel uptime: not connected'),
+      );
     });
   });
 

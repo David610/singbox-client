@@ -61,7 +61,10 @@ void main() {
 
   group('udp probe (DNS round trip)', () {
     test('passes against a minimal local UDP responder', () async {
-      final socket = await RawDatagramSocket.bind(InternetAddress.loopbackIPv4, 0);
+      final socket = await RawDatagramSocket.bind(
+        InternetAddress.loopbackIPv4,
+        0,
+      );
       socket.listen((event) {
         if (event == RawSocketEvent.read) {
           final dg = socket.receive();
@@ -94,26 +97,32 @@ void main() {
   });
 
   group('dns probe', () {
-    test('passes resolving a literal IP address (no real DNS needed)', () async {
-      const probes = NetworkProbes();
-      final result = await probes.dns(hostname: '127.0.0.1');
-      expect(result.status, ProbeStatus.pass);
-    });
+    test(
+      'passes resolving a literal IP address (no real DNS needed)',
+      () async {
+        const probes = NetworkProbes();
+        final result = await probes.dns(hostname: '127.0.0.1');
+        expect(result.status, ProbeStatus.pass);
+      },
+    );
   });
 
   group('quicHeuristic probe', () {
-    test('reports pass with an explicit "heuristic only" detail, not a confirmed handshake', () async {
-      final probes = NetworkProbes(
-        timeout: const Duration(milliseconds: 200),
-        quicProbeHost: '127.0.0.1',
-        probePort: 40125,
-      );
-      final result = await probes.quicHeuristic();
-      // A UDP send with nothing actively refusing it (no ICMP handling in
-      // this sandbox) is expected to report pass -- the important
-      // assertion is that it is labeled a heuristic, never claimed as a
-      // confirmed QUIC handshake.
-      expect(result.detail, contains('heuristic only'));
-    });
+    test(
+      'reports pass with an explicit "heuristic only" detail, not a confirmed handshake',
+      () async {
+        final probes = NetworkProbes(
+          timeout: const Duration(milliseconds: 200),
+          quicProbeHost: '127.0.0.1',
+          probePort: 40125,
+        );
+        final result = await probes.quicHeuristic();
+        // A UDP send with nothing actively refusing it (no ICMP handling in
+        // this sandbox) is expected to report pass -- the important
+        // assertion is that it is labeled a heuristic, never claimed as a
+        // confirmed QUIC handshake.
+        expect(result.detail, contains('heuristic only'));
+      },
+    );
   });
 }

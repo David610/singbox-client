@@ -63,7 +63,8 @@ class _DiagnosticsScreenState extends State<DiagnosticsScreen> {
     try {
       if (Platform.isAndroid) {
         final info = await DeviceInfoPlugin().androidInfo;
-        osVersion = 'Android ${info.version.release} (SDK ${info.version.sdkInt})';
+        osVersion =
+            'Android ${info.version.release} (SDK ${info.version.sdkInt})';
       } else if (Platform.isIOS) {
         final info = await DeviceInfoPlugin().iosInfo;
         osVersion = '${info.systemName} ${info.systemVersion}';
@@ -115,7 +116,10 @@ class _DiagnosticsScreenState extends State<DiagnosticsScreen> {
   Future<void> _runConnectivityTests({required bool includePublicIp}) async {
     setState(() => _running = true);
     final app = await _buildAppContext();
-    final snap = await _collector.captureWithProbes(app, includePublicIp: includePublicIp);
+    final snap = await _collector.captureWithProbes(
+      app,
+      includePublicIp: includePublicIp,
+    );
     if (!mounted) return;
     setState(() {
       _snapshot = snap;
@@ -134,7 +138,10 @@ class _DiagnosticsScreenState extends State<DiagnosticsScreen> {
         content: SizedBox(
           width: double.maxFinite,
           child: SingleChildScrollView(
-            child: SelectableText(text, style: const TextStyle(fontFamily: 'monospace', fontSize: 12)),
+            child: SelectableText(
+              text,
+              style: const TextStyle(fontFamily: 'monospace', fontSize: 12),
+            ),
           ),
         ),
         actions: [
@@ -145,7 +152,10 @@ class _DiagnosticsScreenState extends State<DiagnosticsScreen> {
             },
             child: const Text('Copy to clipboard'),
           ),
-          TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('Close')),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Close'),
+          ),
         ],
       ),
     );
@@ -185,7 +195,9 @@ class _DiagnosticsScreenState extends State<DiagnosticsScreen> {
                     _row('Server hostname', snap.serverHostname ?? 'unknown'),
                     _row(
                       'Tunnel uptime',
-                      snap.tunnelUptime == null ? 'not connected' : snap.tunnelUptime.toString(),
+                      snap.tunnelUptime == null
+                          ? 'not connected'
+                          : snap.tunnelUptime.toString(),
                     ),
                     _row('Reconnect count', '${snap.reconnectCount}'),
                     if (snap.lastEngineError != null)
@@ -200,7 +212,9 @@ class _DiagnosticsScreenState extends State<DiagnosticsScreen> {
                     _probeRow('QUIC/HTTP3 (heuristic)', snap.quicHeuristic),
                     _row(
                       'Approx. latency',
-                      snap.approximateLatency == null ? 'n/a' : '${snap.approximateLatency!.inMilliseconds} ms',
+                      snap.approximateLatency == null
+                          ? 'n/a'
+                          : '${snap.approximateLatency!.inMilliseconds} ms',
                     ),
                   ]),
                   _section('Public IP', [
@@ -222,22 +236,32 @@ class _DiagnosticsScreenState extends State<DiagnosticsScreen> {
                     runSpacing: 8,
                     children: [
                       ElevatedButton(
-                        onPressed: _running ? null : () => _runConnectivityTests(includePublicIp: false),
+                        onPressed: _running
+                            ? null
+                            : () =>
+                                  _runConnectivityTests(includePublicIp: false),
                         child: _running
                             ? const SizedBox(
                                 width: 16,
                                 height: 16,
-                                child: CircularProgressIndicator(strokeWidth: 2),
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
                               )
                             : const Text('Run connectivity tests'),
                       ),
                       OutlinedButton(
-                        onPressed: _running ? null : () => _runConnectivityTests(includePublicIp: true),
+                        onPressed: _running
+                            ? null
+                            : () =>
+                                  _runConnectivityTests(includePublicIp: true),
                         child: const Text('Run tests + check public IP'),
                       ),
                       OutlinedButton(
                         onPressed: _running ? null : _captureIpBaseline,
-                        child: const Text('Capture IP baseline (before connecting)'),
+                        child: const Text(
+                          'Capture IP baseline (before connecting)',
+                        ),
                       ),
                     ],
                   ),
@@ -267,7 +291,10 @@ class _DiagnosticsScreenState extends State<DiagnosticsScreen> {
     child: Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        SizedBox(width: 140, child: Text(label, style: const TextStyle(color: Colors.grey))),
+        SizedBox(
+          width: 140,
+          child: Text(label, style: const TextStyle(color: Colors.grey)),
+        ),
         Expanded(child: SelectableText(value)),
       ],
     ),
@@ -275,16 +302,29 @@ class _DiagnosticsScreenState extends State<DiagnosticsScreen> {
 
   Widget _probeRow(String label, ProbeResult result) {
     final icon = switch (result.status) {
-      ProbeStatus.pass => const Icon(Icons.check_circle, color: Colors.green, size: 18),
+      ProbeStatus.pass => const Icon(
+        Icons.check_circle,
+        color: Colors.green,
+        size: 18,
+      ),
       ProbeStatus.fail => const Icon(Icons.cancel, color: Colors.red, size: 18),
-      ProbeStatus.unknown => const Icon(Icons.help_outline, color: Colors.grey, size: 18),
+      ProbeStatus.unknown => const Icon(
+        Icons.help_outline,
+        color: Colors.grey,
+        size: 18,
+      ),
     };
-    final latency = result.latency == null ? '' : '  ${result.latency!.inMilliseconds}ms';
+    final latency = result.latency == null
+        ? ''
+        : '  ${result.latency!.inMilliseconds}ms';
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 2),
       child: Row(
         children: [
-          SizedBox(width: 140, child: Text(label, style: const TextStyle(color: Colors.grey))),
+          SizedBox(
+            width: 140,
+            child: Text(label, style: const TextStyle(color: Colors.grey)),
+          ),
           icon,
           Text(latency),
         ],

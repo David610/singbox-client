@@ -71,7 +71,8 @@ class NetworkProbes {
   /// Resolves [hostname] (the configured VPN server's hostname when
   /// available, so this doubles as "can I resolve my own server").
   Future<ProbeResult> dns({String? hostname}) async {
-    final target = hostname ?? 'example.com'; // IANA-reserved, universally resolvable
+    final target =
+        hostname ?? 'example.com'; // IANA-reserved, universally resolvable
     final sw = Stopwatch()..start();
     try {
       final addresses = await InternetAddress.lookup(target).timeout(timeout);
@@ -119,7 +120,9 @@ class NetworkProbes {
       });
       final result = await completer.future.timeout(
         timeout,
-        onTimeout: () => ProbeResult.fail(detail: 'no UDP response within ${timeout.inSeconds}s'),
+        onTimeout: () => ProbeResult.fail(
+          detail: 'no UDP response within ${timeout.inSeconds}s',
+        ),
       );
       await sub.cancel();
       return result;
@@ -150,7 +153,9 @@ class NetworkProbes {
       // silence. This is why the result is a heuristic ("appears
       // available"), not a confirmed handshake.
       await Future<void>.delayed(const Duration(milliseconds: 300));
-      return ProbeResult.pass(detail: 'UDP/$probePort send accepted (heuristic only)');
+      return ProbeResult.pass(
+        detail: 'UDP/$probePort send accepted (heuristic only)',
+      );
     } on SocketException catch (e) {
       return ProbeResult.fail(detail: e.osError?.message ?? e.message);
     } finally {

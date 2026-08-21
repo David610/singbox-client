@@ -42,9 +42,14 @@ void main() {
   setUpAll(() async {
     singBoxBin = await findSingBoxBinary();
     haveOpenssl = await findOpenssl();
-    requireRealInteropIfDemanded(available: singBoxBin != null, what: 'sing-box binary');
+    requireRealInteropIfDemanded(
+      available: singBoxBin != null,
+      what: 'sing-box binary',
+    );
     requireRealInteropIfDemanded(available: haveOpenssl, what: 'openssl');
-    workDir = await Directory.systemTemp.createTemp('vpn_core_hysteria2_interop_');
+    workDir = await Directory.systemTemp.createTemp(
+      'vpn_core_hysteria2_interop_',
+    );
   });
 
   tearDownAll(() async {
@@ -67,7 +72,11 @@ void main() {
           'users': [
             {'name': 'interop-test-user', 'password': _testPassword},
           ],
-          'tls': {'enabled': true, 'certificate_path': certPath, 'key_path': keyPath},
+          'tls': {
+            'enabled': true,
+            'certificate_path': certPath,
+            'key_path': keyPath,
+          },
           'obfs': {'type': 'salamander', 'password': _testObfsPassword},
         },
       ],
@@ -80,78 +89,96 @@ void main() {
     return {'path': path};
   }
 
-  test(
-    'Hysteria2+Salamander: generated client outbound carries a TCP request '
-    'AND a UDP-relayed datagram',
-    () async {
-      if (singBoxBin == null || !haveOpenssl) {
-        markTestSkipped('sing-box binary or openssl not available.');
-        return;
-      }
+  test('Hysteria2+Salamander: generated client outbound carries a TCP request '
+      'AND a UDP-relayed datagram', () async {
+    if (singBoxBin == null || !haveOpenssl) {
+      markTestSkipped('sing-box binary or openssl not available.');
+      return;
+    }
 
-      final decoy = await spawnLocalTls13Decoy(workDir); // reused purely for its cert/key
-      final httpTarget = await spawnLocalHttpTarget();
-      final udpEcho = await spawnLocalUdpEcho();
-      addTearDown(() {
-        decoy.stop();
-        httpTarget.stop();
-        udpEcho.stop();
-      });
+    final decoy = await spawnLocalTls13Decoy(
+      workDir,
+    ); // reused purely for its cert/key
+    final httpTarget = await spawnLocalHttpTarget();
+    final udpEcho = await spawnLocalUdpEcho();
+    addTearDown(() {
+      decoy.stop();
+      httpTarget.stop();
+      udpEcho.stop();
+    });
 
-      final hy2Port = await _freePort();
-      final socksPort = await _freePort();
+    final hy2Port = await _freePort();
+    final socksPort = await _freePort();
 
-      final serverCfg = await writeServerConfig(
-        port: hy2Port,
-        certPath: decoy.certPath,
-        keyPath: decoy.keyPath,
-      );
-      await checkSingBoxConfig(singBoxBin!, serverCfg['path'] as String);
+    final serverCfg = await writeServerConfig(
+      port: hy2Port,
+      certPath: decoy.certPath,
+      keyPath: decoy.keyPath,
+    );
+    await checkSingBoxConfig(singBoxBin!, serverCfg['path'] as String);
 
-      // Client: THE REAL vpn_core code path.
-      final outbound = Hysteria2Params(
-        tag: 'hy2-test',
-        server: '127.0.0.1',
-        serverPort: hy2Port,
-        password: _testPassword,
-        salamanderPassword: _testObfsPassword,
-        sni: LocalDecoy.hostname,
-        insecure: true, // local self-signed cert only -- see file header
-      ).toOutboundJson();
+    // Client: THE REAL vpn_core code path.
+    final outbound = Hysteria2Params(
+      tag: 'hy2-test',
+      server: '127.0.0.1',
+      serverPort: hy2Port,
+      password: _testPassword,
+      salamanderPassword: _testObfsPassword,
+      sni: LocalDecoy.hostname,
+      insecure: true, // local self-signed cert only -- see file header
+    ).toOutboundJson();
 
-      final clientConfig = {
-        'log': {'level': 'warn'},
-        'inbounds': [
-          {'type': 'mixed', 'tag': 'mixed-in', 'listen': '127.0.0.1', 'listen_port': socksPort},
-        ],
-        'outbounds': [
-          outbound,
-          {'type': 'direct', 'tag': 'direct'},
-        ],
-        'route': {'final': 'hy2-test'},
-      };
-      final clientConfigPath = '${workDir.path}/hy2_client.json';
-      await File(clientConfigPath).writeAsString(jsonEncode(clientConfig));
-      await checkSingBoxConfig(singBoxBin!, clientConfigPath);
+    final clientConfig = {
+      'log': {'level': 'warn'},
+      'inbounds': [
+        {
+          'type': 'mixed',
+          'tag': 'mixed-in',
+          'listen': '127.0.0.1',
+          'listen_port': socksPort,
+        },
+      ],
+      'outbounds': [
+        outbound,
+        {'type': 'direct', 'tag': 'direct'},
+      ],
+      'route': {'final': 'hy2-test'},
+    };
+    final clientConfigPath = '${workDir.path}/hy2_client.json';
+    await File(clientConfigPath).writeAsString(jsonEncode(clientConfig));
+    await checkSingBoxConfig(singBoxBin!, clientConfigPath);
 
-      final server = await runSingBox(singBoxBin!, serverCfg['path'] as String);
-      final client = await runSingBox(singBoxBin!, clientConfigPath);
-      addTearDown(() {
-        server.kill();
-        client.kill();
-      });
+    final server = await runSingBox(singBoxBin!, serverCfg['path'] as String);
+    final client = await runSingBox(singBoxBin!, clientConfigPath);
+    addTearDown(() {
+      server.kill();
+      client.kill();
+    });
 
-      final response = await socks5HttpGet(socksPort, '127.0.0.1', httpTarget.port);
-      expect(response, isNotNull, reason: 'real Hysteria2+Salamander tunnel should carry TCP');
-      expect(response, contains(LocalHttpTarget.responseBody));
+    final response = await socks5HttpGet(
+      socksPort,
+      '127.0.0.1',
+      httpTarget.port,
+    );
+    expect(
+      response,
+      isNotNull,
+      reason: 'real Hysteria2+Salamander tunnel should carry TCP',
+    );
+    expect(response, contains(LocalHttpTarget.responseBody));
 
-      final probe = Uint8List.fromList(utf8.encode('udp-over-hysteria2-interop-probe'));
-      final echoed = await socks5UdpEcho(socksPort, '127.0.0.1', udpEcho.port, probe);
-      expect(echoed, isNotNull, reason: 'Hysteria2 must relay UDP, not just TCP');
-      expect(echoed, equals(probe));
-    },
-    timeout: const Timeout(Duration(seconds: 60)),
-  );
+    final probe = Uint8List.fromList(
+      utf8.encode('udp-over-hysteria2-interop-probe'),
+    );
+    final echoed = await socks5UdpEcho(
+      socksPort,
+      '127.0.0.1',
+      udpEcho.port,
+      probe,
+    );
+    expect(echoed, isNotNull, reason: 'Hysteria2 must relay UDP, not just TCP');
+    expect(echoed, equals(probe));
+  }, timeout: const Timeout(Duration(seconds: 60)));
 
   test(
     'Hysteria2: a wrong password is rejected -- auth is not weakened',
@@ -186,7 +213,12 @@ void main() {
       final clientConfig = {
         'log': {'level': 'warn'},
         'inbounds': [
-          {'type': 'mixed', 'tag': 'mixed-in', 'listen': '127.0.0.1', 'listen_port': socksPort},
+          {
+            'type': 'mixed',
+            'tag': 'mixed-in',
+            'listen': '127.0.0.1',
+            'listen_port': socksPort,
+          },
         ],
         'outbounds': [
           outbound,
@@ -210,7 +242,11 @@ void main() {
         1,
         timeout: const Duration(seconds: 10),
       );
-      expect(response, isNull, reason: 'a wrong Hysteria2 password must not tunnel traffic');
+      expect(
+        response,
+        isNull,
+        reason: 'a wrong Hysteria2 password must not tunnel traffic',
+      );
     },
     timeout: const Timeout(Duration(seconds: 30)),
   );

@@ -30,10 +30,9 @@ Future<String?> findSingBoxBinary() async {
   final envPath = Platform.environment['SING_BOX_BIN'];
   if (envPath != null && await File(envPath).exists()) return envPath;
   try {
-    final result = await Process.run(
-      Platform.isWindows ? 'where' : 'which',
-      ['sing-box'],
-    );
+    final result = await Process.run(Platform.isWindows ? 'where' : 'which', [
+      'sing-box',
+    ]);
     if (result.exitCode == 0) {
       final path = (result.stdout as String).split('\n').first.trim();
       if (path.isNotEmpty) return path;
@@ -50,8 +49,12 @@ Future<String?> findSingBoxBinary() async {
 /// .github/workflows/singbox-vpn-compat.yml), a missing sing-box binary
 /// or openssl is a hard failure, not a silent skip. Call this from each
 /// interop test file's `setUpAll` after resolving availability.
-void requireRealInteropIfDemanded({required bool available, required String what}) {
-  if (!available && Platform.environment['VPN_CORE_REQUIRE_REAL_INTEROP'] == '1') {
+void requireRealInteropIfDemanded({
+  required bool available,
+  required String what,
+}) {
+  if (!available &&
+      Platform.environment['VPN_CORE_REQUIRE_REAL_INTEROP'] == '1') {
     throw StateError(
       'VPN_CORE_REQUIRE_REAL_INTEROP=1 but $what is not available -- '
       'refusing to silently skip real protocol interop tests.',
@@ -96,17 +99,40 @@ Future<LocalDecoy> spawnLocalTls13Decoy(Directory workDir) async {
   final certPath = '${workDir.path}/decoy.crt';
   final keyPath = '${workDir.path}/decoy.key';
   final keygen = await Process.run('openssl', [
-    'req', '-x509', '-newkey', 'ec', '-pkeyopt', 'ec_paramgen_curve:prime256v1',
-    '-keyout', keyPath, '-out', certPath, '-days', '3', '-nodes',
-    '-subj', '/CN=localhost', '-addext', 'subjectAltName=DNS:localhost',
+    'req',
+    '-x509',
+    '-newkey',
+    'ec',
+    '-pkeyopt',
+    'ec_paramgen_curve:prime256v1',
+    '-keyout',
+    keyPath,
+    '-out',
+    certPath,
+    '-days',
+    '3',
+    '-nodes',
+    '-subj',
+    '/CN=localhost',
+    '-addext',
+    'subjectAltName=DNS:localhost',
   ]);
   if (keygen.exitCode != 0) {
     throw StateError('openssl req failed: ${keygen.stderr}');
   }
   final port = await _freePort();
   final process = await Process.start('openssl', [
-    's_server', '-tls1_3', '-accept', '$port',
-    '-cert', certPath, '-key', keyPath, '-www', '-naccept', '100000',
+    's_server',
+    '-tls1_3',
+    '-accept',
+    '$port',
+    '-cert',
+    certPath,
+    '-key',
+    keyPath,
+    '-www',
+    '-naccept',
+    '100000',
   ]);
   await _waitForPortOpen(port);
   return LocalDecoy(process, port, certPath, keyPath);
@@ -164,7 +190,11 @@ Future<int> _freePort() async {
 Future<void> _waitForPortOpen(int port, {int retries = 50}) async {
   for (var i = 0; i < retries; i++) {
     try {
-      final s = await Socket.connect('127.0.0.1', port, timeout: const Duration(milliseconds: 200));
+      final s = await Socket.connect(
+        '127.0.0.1',
+        port,
+        timeout: const Duration(milliseconds: 200),
+      );
       s.destroy();
       return;
     } catch (_) {
@@ -224,9 +254,14 @@ Future<String?> socks5HttpGet(
 
     final hostBytes = utf8.encode(host);
     socket.add([
-      0x05, 0x01, 0x00, 0x03, hostBytes.length,
+      0x05,
+      0x01,
+      0x00,
+      0x03,
+      hostBytes.length,
       ...hostBytes,
-      (port >> 8) & 0xff, port & 0xff,
+      (port >> 8) & 0xff,
+      port & 0xff,
     ]);
     final replyHead = await reader.readExact(4, timeout);
     if (replyHead == null || replyHead[1] != 0x00) return null;
@@ -240,7 +275,9 @@ Future<String?> socks5HttpGet(
     if (addrLen < 0) return null;
     if (await reader.readExact(addrLen + 2, timeout) == null) return null;
 
-    socket.add(utf8.encode('GET / HTTP/1.1\r\nHost: $host\r\nConnection: close\r\n\r\n'));
+    socket.add(
+      utf8.encode('GET / HTTP/1.1\r\nHost: $host\r\nConnection: close\r\n\r\n'),
+    );
     final body = await reader.readUntilClose(timeout);
     return body == null ? null : utf8.decode(body, allowMalformed: true);
   } finally {
@@ -268,7 +305,11 @@ Future<Uint8List?> socks5UdpEcho(
   RawDatagramSocket? udp;
   try {
     final responses = StreamController<Uint8List>();
-    tcp.listen((d) => responses.add(Uint8List.fromList(d)), onError: (_) {}, cancelOnError: true);
+    tcp.listen(
+      (d) => responses.add(Uint8List.fromList(d)),
+      onError: (_) {},
+      cancelOnError: true,
+    );
     final reader = _ByteReader(responses.stream);
 
     tcp.add([0x05, 0x01, 0x00]);
@@ -286,9 +327,13 @@ Future<Uint8List?> socks5UdpEcho(
     udp = await RawDatagramSocket.bind('127.0.0.1', 0);
     final targetBytes = targetHost.split('.').map(int.parse).toList();
     final header = <int>[
-      0, 0, 0, 0x01,
+      0,
+      0,
+      0,
+      0x01,
       ...targetBytes,
-      (targetPort >> 8) & 0xff, targetPort & 0xff,
+      (targetPort >> 8) & 0xff,
+      targetPort & 0xff,
       ...payload,
     ];
     udp.send(header, InternetAddress(relayIp), relayPort);
@@ -303,7 +348,10 @@ Future<Uint8List?> socks5UdpEcho(
         }
       }
     });
-    final result = await completer.future.timeout(timeout, onTimeout: () => null);
+    final result = await completer.future.timeout(
+      timeout,
+      onTimeout: () => null,
+    );
     await sub.cancel();
     return result;
   } catch (_) {
@@ -316,13 +364,16 @@ Future<Uint8List?> socks5UdpEcho(
 
 class _ByteReader {
   _ByteReader(Stream<Uint8List> stream) {
-    _sub = stream.listen((d) {
-      _buffer.addAll(d);
-      _tryDeliver();
-    }, onDone: () {
-      _closed = true;
-      _tryDeliver();
-    });
+    _sub = stream.listen(
+      (d) {
+        _buffer.addAll(d);
+        _tryDeliver();
+      },
+      onDone: () {
+        _closed = true;
+        _tryDeliver();
+      },
+    );
   }
 
   late final StreamSubscription<Uint8List> _sub;

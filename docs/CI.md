@@ -88,6 +88,45 @@ independently-current Go version (`1.27.0`) instead of inheriting a pin
 that exists for an unrelated reason (reproducing the sing-box build, not
 running gitleaks) — see that job's inline comment.
 
+A third, same-shaped bug was in the same file's `vulnerability-scan` job:
+`osv-scanner v2.5.1` requires Go >=1.26.5, also newer than the pinned
+1.24.7. Fixed the same way — an explicit, independently-current
+`go-version: "1.27.0"` on that job's Go setup step, not the
+`go-version-file` pin against the sing-box tree.
+
+A fourth bug, unrelated to Go versions: `lockfile-consistency`'s
+"pubspec.lock matches pubspec.yaml (app)" step failed with a diff limited
+to the `url:` field of one package (`zxing2`) — `pub.dev` in the committed
+lockfile vs. `pub.flutter-io.cn` (a regional mirror) in what `dart pub
+get` produced on the runner. Same resolved versions, different mirror
+host recorded in the lock. Fixed by pinning `PUB_HOSTED_URL: https://pub.dev`
+on both `dart pub get` steps in that job, so the check always regenerates
+against the same host the committed lockfile was generated against,
+rather than depending on whatever mirror a given runner defaults to.
+
+A fifth bug: `dart format --output=none --set-exit-if-changed .` flagged
+21 files as unformatted. These were genuinely never run through a real
+`dart format` in this project's development history — no Dart/Flutter SDK
+was available in the environment that authored them (see "Known
+current-state gaps" below). Fixed for real, not guessed: a Dart SDK
+matching this repo's pin exactly (3.12.2, the same version bundled with
+`FLUTTER_VERSION: 3.44.9` above) was downloaded from
+`https://storage.googleapis.com/dart-archive/channels/stable/release/3.12.2/sdk/dartsdk-linux-x64-release.zip`
+and used to run `dart format .`, then `dart format --output=none
+--set-exit-if-changed .` was re-run to confirm the result is stable
+(0 files changed on the second pass) before committing. All resulting
+diffs are whitespace/line-wrapping only — reviewed file-by-file to confirm
+no semantic change.
+
+A sixth, unrelated bug surfaced by the same CI run in
+`packages/vpn_core/test/interop/reality_interop_test.dart`: both REALITY
+interop tests declared `const params = VlessRealityParams(...)` while
+passing `serverPort: realityPort`, where `realityPort` is a `final`
+variable assigned at runtime via `await _freePort()` — not a compile-time
+constant, so the `const` constructor invocation is a genuine Dart compile
+error (`Error: Not a constant expression.`), not a flake. Fixed by
+changing both occurrences to `final params = VlessRealityParams(...)`.
+
 ### iOS Xcode version
 
 Because there was no pre-existing pin to preserve, `ios-build.yml` uses

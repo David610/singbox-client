@@ -96,7 +96,8 @@ class DiagnosticsCollector {
 
   void _onStatus(VpnCoreStatus status) {
     if (status.state == VpnCoreState.connected) {
-      if (_lastObservedState != null && _lastObservedState != VpnCoreState.connected) {
+      if (_lastObservedState != null &&
+          _lastObservedState != VpnCoreState.connected) {
         _reconnectCount++;
       }
       _connectedSince ??= DateTime.now();
@@ -136,7 +137,9 @@ class DiagnosticsCollector {
       tcp: ProbeResult.unknown,
       udp: ProbeResult.unknown,
       quicHeuristic: ProbeResult.unknown,
-      tunnelUptime: _connectedSince == null ? null : DateTime.now().difference(_connectedSince!),
+      tunnelUptime: _connectedSince == null
+          ? null
+          : DateTime.now().difference(_connectedSince!),
       reconnectCount: _reconnectCount,
       lastEngineError: lastError,
       profileIdentifierRedacted: app.vlessUuidForCorrelation == null
@@ -198,7 +201,9 @@ class DiagnosticsCollector {
   String? _lastErrorLine(List<String> logs) {
     for (final line in logs.reversed) {
       final lower = line.toLowerCase();
-      if (lower.contains('error') || lower.contains('fatal') || lower.contains('panic')) {
+      if (lower.contains('error') ||
+          lower.contains('fatal') ||
+          lower.contains('panic')) {
         return redactText(line);
       }
     }

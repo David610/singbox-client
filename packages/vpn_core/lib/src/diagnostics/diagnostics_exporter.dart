@@ -30,8 +30,10 @@ class DiagnosticsExporter {
       ..writeln('vpn core: ${json['vpnCoreVersion'] ?? 'unknown'}')
       ..writeln()
       ..writeln('vpn state: ${json['vpnState']}')
-      ..writeln('profile: ${json['selectedProfileLabel'] ?? '(none)'} '
-          '${json['profileIdentifierRedacted'] ?? ''}')
+      ..writeln(
+        'profile: ${json['selectedProfileLabel'] ?? '(none)'} '
+        '${json['profileIdentifierRedacted'] ?? ''}',
+      )
       ..writeln('transport: ${json['selectedTransport'] ?? 'unknown'}')
       ..writeln('server hostname: ${json['serverHostname'] ?? 'unknown'}')
       ..writeln('tunnel uptime: ${_formatSeconds(json['tunnelUptimeSeconds'])}')

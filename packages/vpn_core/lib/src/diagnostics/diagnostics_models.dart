@@ -160,7 +160,9 @@ class DiagnosticsSnapshot {
     'approximateLatencyMs': approximateLatency?.inMilliseconds,
     'tunnelUptimeSeconds': tunnelUptime?.inSeconds,
     'reconnectCount': reconnectCount,
-    'lastEngineError': lastEngineError == null ? null : redactText(lastEngineError!),
+    'lastEngineError': lastEngineError == null
+        ? null
+        : redactText(lastEngineError!),
     'profileIdentifierRedacted': profileIdentifierRedacted,
   };
 }

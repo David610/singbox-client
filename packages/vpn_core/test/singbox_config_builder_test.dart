@@ -25,8 +25,7 @@ void main() {
     });
 
     test('rejects non-reality security', () {
-      const uri =
-          'vless://uuid@example.com:443?security=tls&sni=example.com';
+      const uri = 'vless://uuid@example.com:443?security=tls&sni=example.com';
       expect(
         () => SingBoxConfigBuilder.parseVlessRealityUri(uri),
         throwsA(isA<SingBoxUriParseException>()),
@@ -41,38 +40,41 @@ void main() {
       );
     });
 
-    test('produces a sing-box outbound matching option.VLESSOutboundOptions', () {
-      const params = VlessRealityParams(
-        tag: 'srv-1',
-        server: '203.0.113.10',
-        serverPort: 8443,
-        uuid: '11111111-2222-3333-4444-555555555555',
-        sni: 'www.microsoft.com',
-        publicKey: 'pubkey-value',
-        shortId: 'ab12',
-      );
+    test(
+      'produces a sing-box outbound matching option.VLESSOutboundOptions',
+      () {
+        const params = VlessRealityParams(
+          tag: 'srv-1',
+          server: '203.0.113.10',
+          serverPort: 8443,
+          uuid: '11111111-2222-3333-4444-555555555555',
+          sni: 'www.microsoft.com',
+          publicKey: 'pubkey-value',
+          shortId: 'ab12',
+        );
 
-      final outbound = params.toOutboundJson();
+        final outbound = params.toOutboundJson();
 
-      expect(outbound['type'], 'vless');
-      expect(outbound['server'], '203.0.113.10');
-      expect(outbound['server_port'], 8443);
-      expect(outbound['uuid'], '11111111-2222-3333-4444-555555555555');
-      expect(outbound['flow'], 'xtls-rprx-vision');
+        expect(outbound['type'], 'vless');
+        expect(outbound['server'], '203.0.113.10');
+        expect(outbound['server_port'], 8443);
+        expect(outbound['uuid'], '11111111-2222-3333-4444-555555555555');
+        expect(outbound['flow'], 'xtls-rprx-vision');
 
-      final tls = outbound['tls'] as Map<String, Object?>;
-      expect(tls['enabled'], true);
-      expect(tls['server_name'], 'www.microsoft.com');
+        final tls = outbound['tls'] as Map<String, Object?>;
+        expect(tls['enabled'], true);
+        expect(tls['server_name'], 'www.microsoft.com');
 
-      final reality = tls['reality'] as Map<String, Object?>;
-      expect(reality['enabled'], true);
-      expect(reality['public_key'], 'pubkey-value');
-      expect(reality['short_id'], 'ab12');
+        final reality = tls['reality'] as Map<String, Object?>;
+        expect(reality['enabled'], true);
+        expect(reality['public_key'], 'pubkey-value');
+        expect(reality['short_id'], 'ab12');
 
-      final utls = tls['utls'] as Map<String, Object?>;
-      expect(utls['enabled'], true);
-      expect(utls['fingerprint'], 'chrome');
-    });
+        final utls = tls['utls'] as Map<String, Object?>;
+        expect(utls['enabled'], true);
+        expect(utls['fingerprint'], 'chrome');
+      },
+    );
 
     test('omits flow when explicitly empty (non-Vision transport)', () {
       const params = VlessRealityParams(
@@ -137,28 +139,31 @@ void main() {
       );
     });
 
-    test('produces a sing-box outbound matching option.Hysteria2OutboundOptions', () {
-      const params = Hysteria2Params(
-        tag: 'hy-1',
-        server: '203.0.113.30',
-        serverPort: 443,
-        password: 'auth-pass',
-        salamanderPassword: 'obfs-pass',
-        sni: 'cdn.example.com',
-      );
+    test(
+      'produces a sing-box outbound matching option.Hysteria2OutboundOptions',
+      () {
+        const params = Hysteria2Params(
+          tag: 'hy-1',
+          server: '203.0.113.30',
+          serverPort: 443,
+          password: 'auth-pass',
+          salamanderPassword: 'obfs-pass',
+          sni: 'cdn.example.com',
+        );
 
-      final outbound = params.toOutboundJson();
+        final outbound = params.toOutboundJson();
 
-      expect(outbound['type'], 'hysteria2');
-      expect(outbound['password'], 'auth-pass');
+        expect(outbound['type'], 'hysteria2');
+        expect(outbound['password'], 'auth-pass');
 
-      final obfs = outbound['obfs'] as Map<String, Object?>;
-      expect(obfs['type'], 'salamander');
-      expect(obfs['password'], 'obfs-pass');
+        final obfs = outbound['obfs'] as Map<String, Object?>;
+        expect(obfs['type'], 'salamander');
+        expect(obfs['password'], 'obfs-pass');
 
-      final tls = outbound['tls'] as Map<String, Object?>;
-      expect(tls['server_name'], 'cdn.example.com');
-    });
+        final tls = outbound['tls'] as Map<String, Object?>;
+        expect(tls['server_name'], 'cdn.example.com');
+      },
+    );
 
     test('omits obfs entirely when no salamander password is set', () {
       const params = Hysteria2Params(

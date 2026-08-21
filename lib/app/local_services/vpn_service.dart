@@ -28,7 +28,11 @@ import 'dart:typed_data';
 import 'package:vpn_core/vpn_core.dart';
 
 export 'package:vpn_core/vpn_core.dart'
-    show VpnCoreConfig, SingBoxConfigBuilder, VlessRealityParams, Hysteria2Params;
+    show
+        VpnCoreConfig,
+        SingBoxConfigBuilder,
+        VlessRealityParams,
+        Hysteria2Params;
 
 /// Mirrors `vpn_service`'s connection-state enum. Values and names are
 /// unchanged from every observed call site (`FlutterVpnServiceState.connected`,
