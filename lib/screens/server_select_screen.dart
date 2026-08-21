@@ -6,15 +6,12 @@ import 'dart:io';
 
 import 'package:contextmenu/contextmenu.dart';
 import 'package:flutter/material.dart';
-import 'package:karing/app/local_services/vpn_service.dart';
 import 'package:karing/app/modules/biz.dart';
 import 'package:karing/app/modules/server_manager.dart';
 import 'package:karing/app/modules/setting_manager.dart';
 import 'package:karing/app/runtime/return_result.dart';
 import 'package:karing/app/utils/log.dart';
 import 'package:karing/app/utils/network_utils.dart';
-import 'package:karing/app/utils/proxy_conf_utils.dart';
-import 'package:karing/app/utils/singbox_config_builder.dart';
 import 'package:karing/i18n/strings.g.dart';
 import 'package:karing/screens/common_widget.dart';
 import 'package:karing/screens/dialog_utils.dart';

@@ -357,6 +357,7 @@ class MyAppState extends State<MyApp>
     AppLifecycleStateNofity.init();
     LocaleSettings.getLocaleStream().listen((event) {});
     String launchStartupArg = processArgs.firstWhere(
+      // ignore: unrelated_type_equality_checks
       (element) => element == AppArgs.launchStartup,
       orElse: () => '',
     );
@@ -678,7 +679,7 @@ class MyAppState extends State<MyApp>
 
     await trayManager.setContextMenu(Menu(items: items));
     if (!Platform.isLinux) {
-      await trayManager.popUpContextMenu(bringAppToFront: true);
+      await trayManager.popUpContextMenu();
     }
   }
 

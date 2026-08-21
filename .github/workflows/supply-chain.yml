@@ -109,32 +109,44 @@ jobs:
         # was actually exercised in this project's own development
         # session, unlike an unverified flag name.
         #
-        # PUB_HOSTED_URL is pinned explicitly to match the host already
-        # recorded in the committed pubspec.lock (every package entry's
-        # `url:` field is https://pub.flutter-io.cn, a regional mirror --
-        # not pub.dev). A package's host is part of its lockfile identity
-        # to pub, not just a fetch location: pointing `dart pub get` at a
-        # different host than the one already locked forces a full
-        # re-resolution against that other host's registry state, which
-        # doesn't just rewrite `url:` fields -- it can genuinely pick
-        # different transitive dependency versions (observed on a real CI
-        # run: several packages, e.g. vector_graphics_compiler, resolved
-        # to newer versions once pointed at pub.dev instead of the mirror
-        # the lockfile was actually generated against). See docs/CI.md
-        # "Pinned versions" -- this step must match the host the
-        # committed lockfile actually used, not assume it was pub.dev.
-        env:
-          PUB_HOSTED_URL: https://pub.flutter-io.cn
+        # A package's host is part of its lockfile identity to pub, not
+        # just a fetch location: pointing `dart pub get` at a different
+        # host than the one a lockfile was actually generated against
+        # forces a full re-resolution against that other host's registry
+        # state, which doesn't just rewrite `url:` fields -- it can
+        # genuinely pick different transitive dependency versions. So
+        # this step must not force a host at all -- it must resolve
+        # against whatever host every entry in the *committed* lockfile
+        # already uses. pubspec.lock's every `url:` is https://pub.dev
+        # (verified: `grep -c 'pub.dev' pubspec.lock` matches every
+        # hosted package, zero entries reference any mirror), which is
+        # also `dart pub get`'s own default -- so no PUB_HOSTED_URL
+        # override is set here. (packages/vpn_core's lockfile below was
+        # generated against a different host and gets its own override to
+        # match -- see that step's comment. Forcing this app-level
+        # lockfile to the same mirror was the actual bug this comment
+        # used to describe: it silently re-resolved *this* lockfile
+        # against the wrong host every run, which is a false-positive
+        # inconsistency, not a caught real one.)
         run: |
           dart pub get
           git diff --exit-code -- pubspec.lock
 
       - name: pubspec.lock matches pubspec.yaml (vpn_core)
-        # packages/vpn_core/pubspec.lock is now committed (generated with
-        # a real Flutter SDK matching FLUTTER_VERSION above -- see
-        # docs/CI.md "Known current-state gaps", which previously
-        # documented this as ungenerated) -- same real diff check as the
-        # app-level lockfile above, same mirror-host reasoning.
+        # packages/vpn_core/pubspec.lock was generated against
+        # https://pub.flutter-io.cn (a regional pub.dev mirror; verify
+        # with `grep -c 'flutter-io.cn' packages/vpn_core/pubspec.lock`)
+        # in an environment where that mirror, not pub.dev directly, was
+        # reachable -- every hosted entry's `url:` field already reflects
+        # that host, so PUB_HOSTED_URL is pinned to match it here, same
+        # reasoning as the app-level step above (host is part of a
+        # lockfile's identity, re-resolving against a different host than
+        # the one already locked can genuinely change transitive
+        # versions, not just rewrite `url:` fields). This mismatch
+        # between the two lockfiles' hosts is a real, if slightly
+        # unfortunate, fact about how each was produced -- not something
+        # to paper over by unifying both to one hardcoded host, which is
+        # exactly what silently broke the app-level check above.
         working-directory: packages/vpn_core
         env:
           PUB_HOSTED_URL: https://pub.flutter-io.cn

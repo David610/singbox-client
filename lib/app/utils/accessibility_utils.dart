@@ -19,6 +19,10 @@ class AccessibilityUtils {
     if (!_enabled || message.isEmpty) {
       return;
     }
-    SemanticsService.announce(message, Directionality.of(context));
+    SemanticsService.sendAnnouncement(
+      View.of(context),
+      message,
+      Directionality.of(context),
+    );
   }
 }

@@ -7,7 +7,6 @@ import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:app_installer/app_installer.dart';
-import 'package:karing/app/local_services/vpn_service.dart';
 import 'package:karing/app/modules/vpn_service_state.dart';
 import 'package:karing/app/modules/auto_update_manager.dart';
 import 'package:karing/app/modules/setting_manager.dart';

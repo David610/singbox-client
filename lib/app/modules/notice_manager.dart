@@ -10,7 +10,6 @@ import 'package:karing/app/modules/remote_config_manager.dart';
 import 'package:karing/app/modules/setting_manager.dart';
 import 'package:karing/app/runtime/return_result.dart';
 import 'package:karing/app/utils/app_lifecycle_state_notify.dart';
-import 'package:karing/app/utils/file_utils.dart';
 import 'package:karing/app/utils/karing_utils.dart';
 import 'package:karing/app/utils/log.dart';
 import 'package:karing/app/utils/notice_utils.dart';

@@ -11,7 +11,6 @@ import 'package:karing/app/private/app_url_utils_private.dart';
 import 'package:karing/app/utils/app_lifecycle_state_notify.dart';
 import 'package:karing/app/utils/app_utils.dart';
 import 'package:karing/app/utils/did.dart';
-import 'package:karing/app/utils/file_utils.dart';
 import 'package:karing/app/utils/http_utils.dart';
 import 'package:karing/app/utils/log.dart';
 import 'package:karing/app/utils/notice_utils.dart';

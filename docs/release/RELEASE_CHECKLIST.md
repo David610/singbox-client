@@ -114,20 +114,14 @@ values, and `docs/CI.md`'s "Secret scan" section for how it runs.
 |---|---|---|
 | `IOS_DIST_CERTIFICATE_P12_BASE64` | An Apple Distribution certificate + private key, exported as `.p12`, base64-encoded | Export from Keychain Access (or `security export`) as a `.p12` with a password, then `base64 -w0 cert.p12` |
 | `IOS_DIST_CERTIFICATE_PASSWORD` | That `.p12`'s export password | — |
-| `IOS_PROVISIONING_PROFILE_BASE64` | The main app's App Store distribution provisioning profile, base64-encoded | Download the `.mobileprovision` from Apple Developer, `base64 -w0 profile.mobileprovision` |
+| `IOS_PROVISIONING_PROFILE_BASE64` | The main (Runner/host) app's App Store distribution provisioning profile, base64-encoded, for bundle ID `com.nebula.karing` | Download the `.mobileprovision` from Apple Developer, `base64 -w0 profile.mobileprovision` |
 | `IOS_PROVISIONING_PROFILE_NAME` | That profile's exact `Name` (not filename) — xcodebuild needs this for manual signing | `security cms -D -i profile.mobileprovision \| plutil -extract Name raw -` |
+| `IOS_EXTENSION_PROVISIONING_PROFILE_BASE64` | The PacketTunnel Network Extension target's own App Store distribution provisioning profile, base64-encoded, for bundle ID `com.nebula.karing.PacketTunnel` — a separate signable product from the host app (see `docs/ARCHITECTURE.md` §7), so it needs its own profile, not a reuse of the host app's | Same as `IOS_PROVISIONING_PROFILE_BASE64`, but requested against the `.PacketTunnel` App ID |
+| `IOS_EXTENSION_PROVISIONING_PROFILE_NAME` | That profile's exact `Name` | `security cms -D -i extension-profile.mobileprovision \| plutil -extract Name raw -` |
 | `IOS_TEAM_ID` | Your Apple Developer Team ID (10 characters) | Apple Developer portal → Membership |
 | `APP_STORE_CONNECT_API_KEY_ID` | App Store Connect API key ID | App Store Connect → Users and Access → Integrations → App Store Connect API |
 | `APP_STORE_CONNECT_API_ISSUER_ID` | The associated issuer ID (shared across all your keys) | Same page |
 | `APP_STORE_CONNECT_API_KEY_BASE64` | The downloaded `.p8` private key content, base64-encoded | `base64 -w0 AuthKey_XXXXXXXXXX.p8` -- **Apple lets you download this exactly once**; store the base64 value as the secret immediately |
-
-**Known gap** (see `release.yml`'s header comment and `docs/CI.md` "iOS
-extension target gap"): `IOS_EXTENSION_PROVISIONING_PROFILE_BASE64` is
-not yet consumed by `release.yml` — the Xcode project doesn't register
-the PacketTunnel/NetworkExtension target as its own signable product yet,
-so there's nothing for a second profile to sign. Add this secret and wire
-it into `release.yml`'s signing-import step once that target registration
-(`docs/BUILDING.md` "iOS") lands.
 
 ## GitHub Environment configuration
 

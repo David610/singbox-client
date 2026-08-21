@@ -7,8 +7,6 @@ import 'package:karing/app/modules/server_manager.dart';
 import 'package:karing/app/utils/file_utils.dart';
 import 'package:karing/app/utils/path_utils.dart';
 import 'package:karing/app/utils/platform_utils.dart';
-import 'package:karing/app/utils/proxy_conf_utils.dart';
-import 'package:karing/app/utils/singbox_config_builder.dart';
 import 'package:karing/app/utils/url_launcher_utils.dart';
 import 'package:karing/app/utils/windows_tun_fix_utils.dart';
 import 'package:karing/i18n/strings.g.dart';

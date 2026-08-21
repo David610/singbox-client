@@ -72,9 +72,26 @@ dependencies {
             "(packages/vpn_core/native/singbox-go/build_android.sh)."
         )
     }
-    implementation(files(libboxAar))
+    // compileOnly, NOT implementation: the Android Gradle Plugin refuses
+    // to bundle a *library* module (this one) into an AAR that has a
+    // direct `files()`/local-.aar runtime dependency ("Direct local .aar
+    // file dependencies are not supported when building an AAR" --
+    // bundleDebugAar/bundleReleaseAar) because that dependency's
+    // classes/resources wouldn't be packaged into the resulting AAR
+    // anyway. So this only makes libbox.aar visible to *compile*
+    // SingBoxVpnService.kt's `io.nekohasekai.libbox.*` imports here,
+    // and the app module (android/app/build.gradle.kts, an application
+    // module -- not subject to that restriction) declares the real
+    // `implementation(files(...))` on the same .aar so its classes
+    // actually land in the runtime classpath and the final APK.
+    compileOnly(files(libboxAar))
 
     testImplementation("junit:junit:4.13.2")
     androidTestImplementation("androidx.test.ext:junit:1.2.1")
     androidTestImplementation("androidx.test:runner:1.6.2")
+    // androidTest builds its own separate test APK (not an AAR), so the
+    // "no direct local .aar dependency" restriction above doesn't apply
+    // to it -- it needs the real classes at runtime to actually run
+    // SingBoxVpnServiceInstrumentedTest.kt on a device/emulator.
+    androidTestImplementation(files(libboxAar))
 }

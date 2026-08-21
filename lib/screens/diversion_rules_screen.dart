@@ -1,12 +1,8 @@
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
-import 'package:karing/app/modules/vpn_service_state.dart';
-import 'package:karing/app/local_services/vpn_service.dart';
 import 'package:karing/app/modules/server_manager.dart';
 import 'package:karing/app/modules/setting_manager.dart';
-import 'package:karing/app/utils/proxy_conf_utils.dart';
-import 'package:karing/app/utils/singbox_config_builder.dart';
 import 'package:karing/i18n/strings.g.dart';
 import 'package:karing/screens/diversion_group_custom_screen.dart';
 import 'package:karing/screens/dns_settings_screen.dart';

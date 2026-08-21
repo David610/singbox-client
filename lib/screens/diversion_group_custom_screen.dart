@@ -11,7 +11,6 @@ import 'package:karing/app/utils/diversion_custom_utils.dart';
 import 'package:karing/app/utils/error_reporter_utils.dart';
 import 'package:karing/app/utils/path_utils.dart';
 import 'package:karing/app/utils/platform_utils.dart';
-import 'package:karing/app/utils/proxy_conf_utils.dart';
 import 'package:karing/i18n/strings.g.dart';
 import 'package:ant_icons_plus/ant_icons_plus.dart';
 import 'package:karing/screens/dialog_utils.dart';

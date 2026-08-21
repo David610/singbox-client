@@ -10,7 +10,6 @@ import 'package:karing/app/modules/vpn_service_state.dart';
 import 'package:karing/app/runtime/return_result.dart';
 import 'package:karing/app/utils/clash_api.dart';
 import 'package:karing/app/utils/network_utils.dart';
-import 'package:karing/app/utils/singbox_config_builder.dart';
 import 'package:karing/i18n/strings.g.dart';
 import 'package:karing/screens/dialog_utils.dart';
 import 'package:karing/screens/theme_config.dart';

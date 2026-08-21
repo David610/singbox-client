@@ -13,8 +13,6 @@ import 'package:karing/app/utils/app_lifecycle_state_notify.dart';
 import 'package:karing/app/utils/clash_api.dart';
 import 'package:karing/app/utils/path_utils.dart';
 import 'package:karing/app/utils/platform_utils.dart';
-import 'package:karing/app/utils/proxy_conf_utils.dart';
-import 'package:karing/app/utils/singbox_config_builder.dart';
 import 'package:karing/i18n/strings.g.dart';
 import 'package:karing/screens/common_widget.dart';
 import 'package:karing/screens/dialog_utils.dart';
@@ -31,7 +29,6 @@ import 'package:karing/screens/widgets/text.dart';
 import 'package:path/path.dart' as path;
 import 'package:provider/provider.dart';
 import 'package:tuple/tuple.dart';
-import 'package:karing/app/modules/vpn_service_state.dart';
 
 abstract class SwitchCard extends StatefulWidget {
   const SwitchCard({
@@ -1109,11 +1106,7 @@ class SystemProxyCard extends FutureSwitchCard {
   State<SystemProxyCard> createState() => _SystemProxySwitchCardState();
 
   static bool supportedCurrentPlatfrom() {
-    return [
-      PlatformUtils.windows,
-      PlatformUtils.macos,
-      PlatformUtils.linux,
-    ].contains(Platform.operatingSystem);
+    return PlatformUtils.windows || PlatformUtils.macos || PlatformUtils.linux;
   }
 
   static String id() {
@@ -1395,7 +1388,7 @@ class PerAppCard extends TextCard0 {
   State<PerAppCard> createState() => _PerAppCardState();
 
   static bool supportedCurrentPlatfrom() {
-    return [PlatformUtils.android].contains(Platform.operatingSystem);
+    return PlatformUtils.android;
   }
 
   static String id() {
@@ -1561,10 +1554,7 @@ class AppleTVCard extends TextCard0 {
   State<AppleTVCard> createState() => _AppleTVCardState();
 
   static bool supportedCurrentPlatfrom() {
-    return [
-      PlatformUtils.ios,
-      PlatformUtils.android,
-    ].contains(Platform.operatingSystem);
+    return PlatformUtils.ios || PlatformUtils.android;
   }
 
   static String id() {

@@ -98,6 +98,22 @@ flutter { source = "../.." }
 dependencies {
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
     implementation("androidx.browser:browser:1.8.0")
+
+    // packages/vpn_core (an Android library module, included as a
+    // Flutter plugin) only depends on this compileOnly -- see
+    // packages/vpn_core/android/build.gradle's comment: the Android
+    // Gradle Plugin refuses to bundle a *library* module's own AAR
+    // output if it has a direct local-.aar runtime dependency. This
+    // application module has no such restriction, so it takes the real
+    // `implementation` dependency instead, which is what actually lands
+    // io.nekohasekai.libbox.*'s classes in the runtime classpath and the
+    // final APK -- required for SingBoxVpnService.kt (used by vpn_core,
+    // which this app depends on) to do anything at runtime, not just
+    // compile.
+    val libboxAar = file("../../packages/vpn_core/android/libs/libbox.aar")
+    if (libboxAar.exists()) {
+        implementation(files(libboxAar))
+    }
 }
 
 configurations.configureEach {

@@ -93,3 +93,11 @@ START_HERE_SINGBOX_SPLIT.md
 TECHNICAL_INVENTORY.md
 build_log.txt
 build_output.txt
+
+# Native sing-box/libbox core: a mandatory build INPUT produced from
+# source by packages/vpn_core/native/singbox-go/build_android.sh /
+# build_ios.sh (see docs/BUILDING.md), never committed as a prebuilt
+# binary and never shipped in this repo's git history.
+/packages/vpn_core/android/libs/
+/packages/vpn_core/ios/Frameworks/
+/packages/vpn_core/native/singbox-go/.sing-box-checkout/

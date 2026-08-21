@@ -7,9 +7,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:karing/app/modules/server_manager.dart';
-import 'package:karing/app/modules/vpn_service_state.dart';
 import 'package:karing/app/runtime/return_result.dart';
-import 'package:karing/app/utils/path_utils.dart';
 
 class DiversionCustomRule {
   String name = "";
