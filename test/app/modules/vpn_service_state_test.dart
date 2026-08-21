@@ -96,15 +96,19 @@ void main() {
           ..total = 1000)
         ..updateTime = '2026-01-01T00:00:00Z';
 
-      group.servers.add(ProxyConfig()
-        ..tag = 'srv-1'
-        ..type = 'vless'
-        ..server = 'example.com'
-        ..serverport = 443);
-      group.urltests.add(ProxyUrltest()
-        ..remark = 'auto'
-        ..tag = 'urltest-1'
-        ..tags = ['srv-1']);
+      group.servers.add(
+        ProxyConfig()
+          ..tag = 'srv-1'
+          ..type = 'vless'
+          ..server = 'example.com'
+          ..serverport = 443,
+      );
+      group.urltests.add(
+        ProxyUrltest()
+          ..remark = 'auto'
+          ..tag = 'urltest-1'
+          ..tags = ['srv-1'],
+      );
 
       final decoded = jsonDecode(jsonEncode(group.toJson()));
       final restored = ServerConfigGroupItem()..fromJson(decoded);
@@ -171,18 +175,30 @@ void main() {
 
   group('FlutterVpnServiceState.fromCore', () {
     test('maps every VpnCoreState value to its matching Flutter state', () {
-      expect(FlutterVpnServiceState.fromCore(VpnCoreState.invalid),
-          FlutterVpnServiceState.invalid);
-      expect(FlutterVpnServiceState.fromCore(VpnCoreState.disconnected),
-          FlutterVpnServiceState.disconnected);
-      expect(FlutterVpnServiceState.fromCore(VpnCoreState.connecting),
-          FlutterVpnServiceState.connecting);
-      expect(FlutterVpnServiceState.fromCore(VpnCoreState.connected),
-          FlutterVpnServiceState.connected);
-      expect(FlutterVpnServiceState.fromCore(VpnCoreState.reasserting),
-          FlutterVpnServiceState.reasserting);
-      expect(FlutterVpnServiceState.fromCore(VpnCoreState.disconnecting),
-          FlutterVpnServiceState.disconnecting);
+      expect(
+        FlutterVpnServiceState.fromCore(VpnCoreState.invalid),
+        FlutterVpnServiceState.invalid,
+      );
+      expect(
+        FlutterVpnServiceState.fromCore(VpnCoreState.disconnected),
+        FlutterVpnServiceState.disconnected,
+      );
+      expect(
+        FlutterVpnServiceState.fromCore(VpnCoreState.connecting),
+        FlutterVpnServiceState.connecting,
+      );
+      expect(
+        FlutterVpnServiceState.fromCore(VpnCoreState.connected),
+        FlutterVpnServiceState.connected,
+      );
+      expect(
+        FlutterVpnServiceState.fromCore(VpnCoreState.reasserting),
+        FlutterVpnServiceState.reasserting,
+      );
+      expect(
+        FlutterVpnServiceState.fromCore(VpnCoreState.disconnecting),
+        FlutterVpnServiceState.disconnecting,
+      );
     });
   });
 }

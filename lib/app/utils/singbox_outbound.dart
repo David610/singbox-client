@@ -6,6 +6,7 @@
 import 'package:flutter/widgets.dart';
 import 'package:karing/screens/group_item_options.dart';
 import 'package:karing/screens/group_item_creator.dart';
+
 class SingboxOutboundType {
   final String name;
   const SingboxOutboundType._(this.name);
@@ -90,7 +91,8 @@ class SingboxOutboundShadowsocksOptions extends SingboxOutboundProtocolOptions {
   String? password;
 }
 
-class SingboxOutboundShadowsocksROptions extends SingboxOutboundProtocolOptions {
+class SingboxOutboundShadowsocksROptions
+    extends SingboxOutboundProtocolOptions {
   String? method;
   String? password;
   String? obfs;
@@ -298,7 +300,8 @@ class SingboxOutboundOptions {
         common(shadowsocksr!);
         break;
       case "shadowtls":
-        shadowtls = SingboxOutboundShadowTLSOptions()..password = map["password"];
+        shadowtls = SingboxOutboundShadowTLSOptions()
+          ..password = map["password"];
         common(shadowtls!);
         break;
       case "vmess":
@@ -338,7 +341,8 @@ class SingboxOutboundOptions {
         common(hysteria!);
         break;
       case "hysteria2":
-        hysteria2 = SingboxOutboundHysteria2Options()..password = map["password"];
+        hysteria2 = SingboxOutboundHysteria2Options()
+          ..password = map["password"];
         common(hysteria2!);
         break;
       case "wireguard":
@@ -354,7 +358,8 @@ class SingboxOutboundOptions {
         common(tuic!);
         break;
       case "tor":
-        tor = SingboxOutboundTorOptions()..executablePath = map["executable_path"];
+        tor = SingboxOutboundTorOptions()
+          ..executablePath = map["executable_path"];
         common(tor!);
         break;
       case "ssh":
@@ -455,6 +460,4 @@ class SingboxOutboundMultiplexBrutalOptions {
 /// Domains excluded from the local HTTP proxy by default (Apple push and
 /// other services that misbehave when proxied) -- matches this app's own
 /// `excludeApns`-adjacent settings, not a sing-box schema constant.
-const List<String> ProxyBypassDoaminsDefault = [
-  "push.apple.com",
-];
+const List<String> ProxyBypassDoaminsDefault = ["push.apple.com"];

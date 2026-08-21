@@ -56,7 +56,10 @@ class AutoConfUtils {
         return result.error;
       }
       if (result.data!.item1 != 200) {
-        return ReturnResultError("http statusCode:${result.data!.item1}", report: false);
+        return ReturnResultError(
+          "http statusCode:${result.data!.item1}",
+          report: false,
+        );
       }
       content = result.data!.item2;
     }
@@ -100,14 +103,19 @@ class AutoConfUtils {
       server.type = type;
       server.tag = o["tag"]?.toString() ?? "";
       server.server = o["server"]?.toString() ?? "";
-      server.serverport = (o["server_port"] is int) ? o["server_port"] as int : 0;
+      server.serverport = (o["server_port"] is int)
+          ? o["server_port"] as int
+          : 0;
       server.remark = server.tag;
       server.raw = Map<String, dynamic>.from(o);
       servers.add(server);
     }
 
     if (servers.isEmpty) {
-      return ReturnResultError("no usable proxy outbounds found", report: false);
+      return ReturnResultError(
+        "no usable proxy outbounds found",
+        report: false,
+      );
     }
     item.servers = servers;
     return null;

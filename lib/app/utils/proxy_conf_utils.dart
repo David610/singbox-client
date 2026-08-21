@@ -61,7 +61,9 @@ class ProxyConfUtils {
     final trimmed = content.trim();
     final uri = Uri.tryParse(trimmed);
     if (uri == null || uri.scheme.isEmpty) {
-      return ReturnResult(error: ReturnResultError("invalid QR content", report: false));
+      return ReturnResult(
+        error: ReturnResultError("invalid QR content", report: false),
+      );
     }
     return ReturnResult(data: trimmed);
   }

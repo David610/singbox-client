@@ -61,7 +61,8 @@ class NetworkUtils {
     String host = value;
     if (allowPort) {
       final lastColon = value.lastIndexOf(':');
-      if (lastColon > 0 && int.tryParse(value.substring(lastColon + 1)) != null) {
+      if (lastColon > 0 &&
+          int.tryParse(value.substring(lastColon + 1)) != null) {
         host = value.substring(0, lastColon);
       }
     }
@@ -150,7 +151,10 @@ class NetworkUtils {
   ) async {
     for (final port in preferred) {
       try {
-        final socket = await ServerSocket.bind(InternetAddress.loopbackIPv4, port);
+        final socket = await ServerSocket.bind(
+          InternetAddress.loopbackIPv4,
+          port,
+        );
         sockets.add(socket);
         return port;
       } catch (_) {

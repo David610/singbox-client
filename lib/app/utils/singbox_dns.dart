@@ -37,7 +37,10 @@ ReturnResult<List<SingboxDNSServerBatchOptions>> SingboxDNSTryParseList(
     final uri = Uri.tryParse(urls[i]);
     if (uri == null) {
       return ReturnResult(
-        error: ReturnResultError("invalid DNS server url: ${urls[i]}", report: false),
+        error: ReturnResultError(
+          "invalid DNS server url: ${urls[i]}",
+          report: false,
+        ),
       );
     }
     servers.add(

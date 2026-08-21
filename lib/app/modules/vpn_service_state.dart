@@ -331,7 +331,8 @@ class ServerConfigGroupItem {
   List<String> testLatency = [];
   List<String> testLatencyIndepends = [];
 
-  bool isRemote() => urlOrPath.startsWith("http://") || urlOrPath.startsWith("https://");
+  bool isRemote() =>
+      urlOrPath.startsWith("http://") || urlOrPath.startsWith("https://");
 
   Map<String, dynamic> toJson() => {
     'groupid': groupid,
@@ -380,7 +381,9 @@ class ServerConfigGroupItem {
     urlOrPath = map["url_or_path"] ?? "";
     site = map["site"] ?? "";
     userAgentAppend = map["useragent_append"] ?? false;
-    userAgentCompatibles = List<String>.from(map["useragent_compatibles"] ?? []);
+    userAgentCompatibles = List<String>.from(
+      map["useragent_compatibles"] ?? [],
+    );
     xhwid = map["xhwid"] ?? false;
     if (map["proxy_filter"] != null) proxyFilter.fromJson(map["proxy_filter"]);
     proxyFilterRemove = List<String>.from(map["proxy_filter_remove"] ?? []);
@@ -665,9 +668,7 @@ class VPNService {
   static ProxyConfig _current = ProxyConfig();
   static bool _tunMode = true;
   static bool _systemProxyEnable = false;
-  static final List<
-    void Function(FlutterVpnServiceState, Map<String, String>)
-  >
+  static final List<void Function(FlutterVpnServiceState, Map<String, String>)>
   onEventStateChanged = [];
 
   static Future<void> init() async {

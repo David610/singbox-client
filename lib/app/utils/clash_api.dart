@@ -72,7 +72,14 @@ class ClashApi {
       "${_base(controlPort)}/proxies/${Uri.encodeComponent(tag)}/delay"
       "?timeout=$timeoutMs&url=${Uri.encodeComponent(targetUrl)}",
     );
-    final result = await HttpUtils.httpGetRequest(uri.toString(), null, null, Duration(milliseconds: timeoutMs), null, null);
+    final result = await HttpUtils.httpGetRequest(
+      uri.toString(),
+      null,
+      null,
+      Duration(milliseconds: timeoutMs),
+      null,
+      null,
+    );
     if (result.error != null) {
       return ReturnResult(error: result.error);
     }
@@ -85,7 +92,9 @@ class ClashApi {
       final decoded = jsonDecode(body);
       return ReturnResult(data: (decoded["delay"] ?? "").toString());
     } catch (err) {
-      return ReturnResult(error: ReturnResultError(err.toString(), report: false));
+      return ReturnResult(
+        error: ReturnResultError(err.toString(), report: false),
+      );
     }
   }
 
@@ -99,7 +108,14 @@ class ClashApi {
     // for this is dialing through the group's own local mixed/HTTP proxy
     // port while it is selected -- out of scope to wire up generically
     // here since it needs the local proxy port, not just controlPort.
-    final result = await HttpUtils.httpGetRequest(targetUrl, null, null, const Duration(milliseconds: 8000), null, null);
+    final result = await HttpUtils.httpGetRequest(
+      targetUrl,
+      null,
+      null,
+      const Duration(milliseconds: 8000),
+      null,
+      null,
+    );
     if (result.error != null) {
       return ReturnResult(error: result.error);
     }
@@ -112,7 +128,14 @@ class ClashApi {
     int controlPort,
   ) async {
     final uri = "${_base(controlPort)}/group";
-    return HttpUtils.httpGetRequest(uri, null, null, const Duration(milliseconds: 5000), null, null);
+    return HttpUtils.httpGetRequest(
+      uri,
+      null,
+      null,
+      const Duration(milliseconds: 5000),
+      null,
+      null,
+    );
   }
 
   static Future<String> getSecret() async => "";
@@ -126,7 +149,16 @@ class ClashApi {
     DNSQueryRequest req,
   ) async {
     final uri = "${_base(controlPort)}/dns/query";
-    return HttpUtils.httpPostRequest(uri, null, null, jsonEncode(req.toJson()), const Duration(milliseconds: 5000), null, null, null);
+    return HttpUtils.httpPostRequest(
+      uri,
+      null,
+      null,
+      jsonEncode(req.toJson()),
+      const Duration(milliseconds: 5000),
+      null,
+      null,
+      null,
+    );
   }
 
   static Future<ReturnResult<Tuple2<int, String>>> dnsQueryWithDefaultRouter(
@@ -136,7 +168,14 @@ class ClashApi {
   ) async {
     final uri =
         "${_base(controlPort)}/dns/query?name=${Uri.encodeComponent(domain)}&strategy=$strategy";
-    return HttpUtils.httpGetRequest(uri, null, null, const Duration(milliseconds: 5000), null, null);
+    return HttpUtils.httpGetRequest(
+      uri,
+      null,
+      null,
+      const Duration(milliseconds: 5000),
+      null,
+      null,
+    );
   }
 
   static Future<ReturnResult<Tuple2<int, String>>> outboundQuery(
@@ -146,12 +185,21 @@ class ClashApi {
   ) async {
     final uri =
         "${_base(controlPort)}/route/rule-match?domain=${Uri.encodeComponent(domain)}&ip=${Uri.encodeComponent(ip)}";
-    return HttpUtils.httpGetRequest(uri, null, null, const Duration(milliseconds: 5000), null, null);
+    return HttpUtils.httpGetRequest(
+      uri,
+      null,
+      null,
+      const Duration(milliseconds: 5000),
+      null,
+      null,
+    );
   }
 
   /// Local ruleset cache freshness -- no remote fetch, so an empty result
   /// (nothing cached yet) is a real, honest answer rather than a stub.
-  static Future<ReturnResult<Tuple2<Map<String, DateTime>, Map<String, String>>>>
+  static Future<
+    ReturnResult<Tuple2<Map<String, DateTime>, Map<String, String>>>
+  >
   getRemoteRulesetsStates(int controlPort) async {
     return ReturnResult(data: Tuple2(<String, DateTime>{}, <String, String>{}));
   }
@@ -170,9 +218,17 @@ class ClashApi {
   /// the real endpoint every clash-compatible client uses for "recheck
   /// now").
   static Future<void> updateUrltestCheck(int controlPort) async {
-    final uri = "${_base(controlPort)}/group/$kOutboundTagUrltest/delay"
+    final uri =
+        "${_base(controlPort)}/group/$kOutboundTagUrltest/delay"
         "?timeout=5000&url=https://www.gstatic.com/generate_204";
-    await HttpUtils.httpGetRequest(uri, null, null, const Duration(seconds: 6), null, null);
+    await HttpUtils.httpGetRequest(
+      uri,
+      null,
+      null,
+      const Duration(seconds: 6),
+      null,
+      null,
+    );
   }
 
   static Future<String> getConnectionsUrl(
@@ -184,20 +240,43 @@ class ClashApi {
 
   static Future<void> resetNetwork(int controlPort) async {
     final uri = "${_base(controlPort)}/route/rule-set/refresh";
-    await HttpUtils.httpPostRequest(uri, null, null, null, const Duration(seconds: 5), null, null, null);
+    await HttpUtils.httpPostRequest(
+      uri,
+      null,
+      null,
+      null,
+      const Duration(seconds: 5),
+      null,
+      null,
+      null,
+    );
   }
 
   static Future<void> resetOutboundConnections(int controlPort) async {
     final uri = "${_base(controlPort)}/connections";
-    await HttpUtils.httpPostRequest(uri, null, {}, null, const Duration(seconds: 5), null, null, null);
+    await HttpUtils.httpPostRequest(
+      uri,
+      null,
+      {},
+      null,
+      const Duration(seconds: 5),
+      null,
+      null,
+      null,
+    );
   }
 
-  static Future<ReturnResult<CurrentServerForUrltest>> getCurrentServerForUrltest(
-    String groupTag,
-    int controlPort,
-  ) async {
+  static Future<ReturnResult<CurrentServerForUrltest>>
+  getCurrentServerForUrltest(String groupTag, int controlPort) async {
     final uri = "${_base(controlPort)}/group/${Uri.encodeComponent(groupTag)}";
-    final result = await HttpUtils.httpGetRequest(uri, null, null, const Duration(milliseconds: 5000), null, null);
+    final result = await HttpUtils.httpGetRequest(
+      uri,
+      null,
+      null,
+      const Duration(milliseconds: 5000),
+      null,
+      null,
+    );
     if (result.error != null) {
       return ReturnResult(error: result.error);
     }
@@ -212,7 +291,9 @@ class ClashApi {
       data.fromJson(decoded);
       return ReturnResult(data: data);
     } catch (err) {
-      return ReturnResult(error: ReturnResultError(err.toString(), report: false));
+      return ReturnResult(
+        error: ReturnResultError(err.toString(), report: false),
+      );
     }
   }
 }

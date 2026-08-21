@@ -111,7 +111,8 @@ class SingboxConfigBuilder {
     List<dynamic> allOutbounds,
     Map<String, dynamic> extra,
     dynamic extra2,
-    List<Tuple3<DiversionRulesGroup, ProxyConfig, List<String>>> diversionGroups,
+    List<Tuple3<DiversionRulesGroup, ProxyConfig, List<String>>>
+    diversionGroups,
     List<dynamic> inbounds,
     Map<String, dynamic> dns, [
     dynamic extra3,

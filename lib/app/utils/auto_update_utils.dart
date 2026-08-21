@@ -49,7 +49,10 @@ class AutoupdateUtils {
     }
     if (result.data!.item1 != 200) {
       return ReturnResult(
-        error: ReturnResultError("http statusCode:${result.data!.item1}", report: false),
+        error: ReturnResultError(
+          "http statusCode:${result.data!.item1}",
+          report: false,
+        ),
       );
     }
     try {
@@ -66,7 +69,9 @@ class AutoupdateUtils {
       }
       return ReturnResult(data: items);
     } catch (err) {
-      return ReturnResult(error: ReturnResultError(err.toString(), report: false));
+      return ReturnResult(
+        error: ReturnResultError(err.toString(), report: false),
+      );
     }
   }
 
@@ -86,16 +91,23 @@ class AutoupdateUtils {
     }
     if (result.data!.item1 != 200) {
       return ReturnResult(
-        error: ReturnResultError("http statusCode:${result.data!.item1}", report: false),
+        error: ReturnResultError(
+          "http statusCode:${result.data!.item1}",
+          report: false,
+        ),
       );
     }
     try {
       final decoded = jsonDecode(result.data!.item2);
       final config = RemoteConfig();
-      config.fromJson(decoded is Map ? Map<String, dynamic>.from(decoded) : null);
+      config.fromJson(
+        decoded is Map ? Map<String, dynamic>.from(decoded) : null,
+      );
       return ReturnResult(data: config);
     } catch (err) {
-      return ReturnResult(error: ReturnResultError(err.toString(), report: false));
+      return ReturnResult(
+        error: ReturnResultError(err.toString(), report: false),
+      );
     }
   }
 }

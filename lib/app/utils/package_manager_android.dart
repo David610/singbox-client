@@ -26,7 +26,10 @@ class PackageInfoEx {
 /// `PackageInfo` contract.
 class PackageInfoImpl extends PackageInfo {
   const PackageInfoImpl({String? packageName})
-    : super(installLocation: AndroidInstallLocation.auto, packageName: packageName);
+    : super(
+        installLocation: AndroidInstallLocation.auto,
+        packageName: packageName,
+      );
 }
 
 class PackageManagerAndroid {
