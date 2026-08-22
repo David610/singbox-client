@@ -179,6 +179,23 @@ dependency_overrides:
       path: packages/window_manager
 
 flutter:
+  # Several first-party and third-party iOS plugins in this dependency tree
+  # (app_installer, flutter_keyboard_visibility, icloud_storage,
+  # move_to_background, path_provider_foundation, protocol_handler, and our
+  # own vpn_core) do not support Swift Package Manager, so `flutter build
+  # ios` resolves them via CocoaPods while resolving the SPM-capable
+  # plugins (image_picker's DKImagePickerController, sentry_flutter, etc.)
+  # via the generated FlutterGeneratedPluginSwiftPackage. That hybrid
+  # resolution left the Runner app target linking without UIKit
+  # auto-linked -- `flutter build ios --release --no-codesign` failed with
+  # "Undefined symbol: _OBJC_CLASS_$_UIApplication" /
+  # "_UIBackgroundTaskInvalid" even though every source file that needs
+  # UIKit imports it correctly. Routing every plugin through CocoaPods
+  # (this project's Podfile already does `flutter_install_all_ios_pods`)
+  # removes the hybrid path and its inconsistent auto-linking. See
+  # https://docs.flutter.dev/packages-and-plugins/swift-package-manager/for-app-developers#opt-out
+  config:
+    enable-swift-package-manager: false
   uses-material-design: true
   assets:
     - assets/zashboard/
