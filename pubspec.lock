@@ -2255,4 +2255,4 @@ packages:
     version: "0.2.4"
 sdks:
   dart: ">=3.12.2 <4.0.0"
-  flutter: ">=3.44.0"
+  flutter: ">=3.44.2"
