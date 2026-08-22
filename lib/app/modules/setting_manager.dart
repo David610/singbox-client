@@ -1,16 +1,15 @@
 // ignore_for_file: empty_catches
 
-import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
 
 import 'package:country/country.dart' as country;
 import 'package:flutter/widgets.dart';
-import 'package:karing/app/utils/file_saver.dart';
 import 'package:karing/app/runtime/type_checker.dart';
 import 'package:karing/app/utils/app_utils.dart';
 import 'package:karing/app/utils/cloudflare_warp_utils.dart';
 import 'package:karing/app/utils/convert_utils.dart';
+import 'package:karing/app/utils/credential_store.dart';
 import 'package:karing/app/utils/log.dart';
 import 'package:karing/app/utils/network_utils.dart';
 import 'package:karing/app/utils/path_utils.dart';
@@ -1888,9 +1887,7 @@ class SettingConfig {
 class SettingManager {
   static bool _dirty = false;
   static final SettingConfig _config = SettingConfig();
-  static final FileSaver _fileSaver = FileSaver();
   static Future<void> init({bool fromBackupRestore = false}) async {
-    _fileSaver.setSavePath(await PathUtils.settingFilePath());
     await load();
     if (fromBackupRestore) {
       if (!Platform.isWindows) {
@@ -1966,7 +1963,10 @@ class SettingManager {
     try {
       content = await file.readAsString();
       if (content.isNotEmpty) {
-        var config = jsonDecode(content);
+        var config = await ProfileCredentialStore(
+          PlatformCredentialBackend(),
+          namespace: 'settings',
+        ).readAndMigrate(file);
         _config.fromJson(config);
         if (_config.uiScreen.backgroundImageType ==
                 SettingConfigItemUIScreen.backgroundTypeLocal &&
@@ -1985,7 +1985,10 @@ class SettingManager {
   }
 
   static Future<void> save() async {
-    await _fileSaver.saveAsJson(_config);
+    await ProfileCredentialStore(
+      PlatformCredentialBackend(),
+      namespace: 'settings',
+    ).write(File(await PathUtils.settingFilePath()), _config.toJson());
   }
 
   static SettingConfig getConfig() {
