@@ -56,130 +56,142 @@ void main() {
     });
   });
 
-  group('HttpUtils bounded-fetch mechanics (loopback http, TLS not needed)', () {
-    late HttpServer server;
+  group(
+    'HttpUtils bounded-fetch mechanics (loopback http, TLS not needed)',
+    () {
+      late HttpServer server;
 
-    tearDown(() async {
-      await server.close(force: true);
-    });
-
-    test('a normal 200 response is returned intact', () async {
-      server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
-      server.listen((req) {
-        req.response
-          ..statusCode = 200
-          ..write('{"ok":true}');
-        req.response.close();
+      tearDown(() async {
+        await server.close(force: true);
       });
-      final url = Uri.parse('http://127.0.0.1:${server.port}/sub');
 
-      final result = await HttpUtils.fetchBoundedForTesting(url);
+      test('a normal 200 response is returned intact', () async {
+        server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+        server.listen((req) {
+          req.response
+            ..statusCode = 200
+            ..write('{"ok":true}');
+          req.response.close();
+        });
+        final url = Uri.parse('http://127.0.0.1:${server.port}/sub');
 
-      expect(result.error, isNull);
-      expect(result.data!.item1, 200);
-      expect(result.data!.item2, '{"ok":true}');
-    });
+        final result = await HttpUtils.fetchBoundedForTesting(url);
 
-    test('malformed body content is still returned, not crashed on', () async {
-      // HttpUtils only fetches bytes; parsing/validating subscription
-      // content is the caller's job (AutoConfUtils), so a bounded fetch
-      // must hand back whatever bytes it got rather than throwing on
-      // content that isn't valid JSON/subscription data.
-      server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
-      server.listen((req) {
-        req.response
-          ..statusCode = 200
-          ..write('{not: valid json ]]]');
-        req.response.close();
+        expect(result.error, isNull);
+        expect(result.data!.item1, 200);
+        expect(result.data!.item2, '{"ok":true}');
       });
-      final url = Uri.parse('http://127.0.0.1:${server.port}/sub');
 
-      final result = await HttpUtils.fetchBoundedForTesting(url);
+      test(
+        'malformed body content is still returned, not crashed on',
+        () async {
+          // HttpUtils only fetches bytes; parsing/validating subscription
+          // content is the caller's job (AutoConfUtils), so a bounded fetch
+          // must hand back whatever bytes it got rather than throwing on
+          // content that isn't valid JSON/subscription data.
+          server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+          server.listen((req) {
+            req.response
+              ..statusCode = 200
+              ..write('{not: valid json ]]]');
+            req.response.close();
+          });
+          final url = Uri.parse('http://127.0.0.1:${server.port}/sub');
 
-      expect(result.error, isNull);
-      expect(result.data!.item2, '{not: valid json ]]]');
-    });
+          final result = await HttpUtils.fetchBoundedForTesting(url);
 
-    test('a same-scheme redirect chain within the cap is followed', () async {
-      server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
-      server.listen((req) {
-        if (req.uri.path == '/start') {
+          expect(result.error, isNull);
+          expect(result.data!.item2, '{not: valid json ]]]');
+        },
+      );
+
+      test('a same-scheme redirect chain within the cap is followed', () async {
+        server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+        server.listen((req) {
+          if (req.uri.path == '/start') {
+            req.response.statusCode = 302;
+            req.response.headers.set(
+              'location',
+              'http://127.0.0.1:${server.port}/final',
+            );
+            req.response.close();
+          } else {
+            req.response
+              ..statusCode = 200
+              ..write('final-content');
+            req.response.close();
+          }
+        });
+        final url = Uri.parse('http://127.0.0.1:${server.port}/start');
+
+        final result = await HttpUtils.fetchBoundedForTesting(url);
+
+        expect(result.error, isNull);
+        expect(result.data!.item2, 'final-content');
+      });
+
+      test('a redirect chain exceeding the hop cap is rejected', () async {
+        server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+        server.listen((req) {
+          final n = int.tryParse(req.uri.pathSegments.last) ?? 0;
           req.response.statusCode = 302;
           req.response.headers.set(
             'location',
-            'http://127.0.0.1:${server.port}/final',
+            'http://127.0.0.1:${server.port}/hop/${n + 1}',
           );
           req.response.close();
-        } else {
-          req.response
-            ..statusCode = 200
-            ..write('final-content');
-          req.response.close();
-        }
-      });
-      final url = Uri.parse('http://127.0.0.1:${server.port}/start');
+        });
+        final url = Uri.parse('http://127.0.0.1:${server.port}/hop/0');
 
-      final result = await HttpUtils.fetchBoundedForTesting(url);
-
-      expect(result.error, isNull);
-      expect(result.data!.item2, 'final-content');
-    });
-
-    test('a redirect chain exceeding the hop cap is rejected', () async {
-      server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
-      server.listen((req) {
-        final n = int.tryParse(req.uri.pathSegments.last) ?? 0;
-        req.response.statusCode = 302;
-        req.response.headers.set(
-          'location',
-          'http://127.0.0.1:${server.port}/hop/${n + 1}',
+        final result = await HttpUtils.fetchBoundedForTesting(
+          url,
+          maxRedirects: 2,
         );
-        req.response.close();
-      });
-      final url = Uri.parse('http://127.0.0.1:${server.port}/hop/0');
 
-      final result = await HttpUtils.fetchBoundedForTesting(
-        url,
-        maxRedirects: 2,
+        expect(result.data, isNull);
+        expect(result.error, isNotNull);
+        expect(result.error!.message, contains('redirect'));
+      });
+
+      test(
+        'a response exceeding the byte cap is rejected, not buffered whole',
+        () async {
+          server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+          server.listen((req) {
+            req.response.statusCode = 200;
+            req.response.add(List<int>.filled(4096, 0x41));
+            req.response.close();
+          });
+          final url = Uri.parse('http://127.0.0.1:${server.port}/sub');
+
+          final result = await HttpUtils.fetchBoundedForTesting(
+            url,
+            maxBytes: 1024,
+          );
+
+          expect(result.data, isNull);
+          expect(result.error, isNotNull);
+        },
       );
 
-      expect(result.data, isNull);
-      expect(result.error, isNotNull);
-      expect(result.error!.message, contains('redirect'));
-    });
+      test(
+        'a non-2xx/3xx status is surfaced as an error, not thrown',
+        () async {
+          server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+          server.listen((req) {
+            req.response.statusCode = 500;
+            req.response.close();
+          });
+          final url = Uri.parse('http://127.0.0.1:${server.port}/sub');
 
-    test('a response exceeding the byte cap is rejected, not buffered whole', () async {
-      server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
-      server.listen((req) {
-        req.response.statusCode = 200;
-        req.response.add(List<int>.filled(4096, 0x41));
-        req.response.close();
-      });
-      final url = Uri.parse('http://127.0.0.1:${server.port}/sub');
+          final result = await HttpUtils.fetchBoundedForTesting(url);
 
-      final result = await HttpUtils.fetchBoundedForTesting(
-        url,
-        maxBytes: 1024,
+          expect(result.data, isNull);
+          expect(result.error, isNotNull);
+        },
       );
-
-      expect(result.data, isNull);
-      expect(result.error, isNotNull);
-    });
-
-    test('a non-2xx/3xx status is surfaced as an error, not thrown', () async {
-      server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
-      server.listen((req) {
-        req.response.statusCode = 500;
-        req.response.close();
-      });
-      final url = Uri.parse('http://127.0.0.1:${server.port}/sub');
-
-      final result = await HttpUtils.fetchBoundedForTesting(url);
-
-      expect(result.data, isNull);
-      expect(result.error, isNotNull);
-    });
-  });
+    },
+  );
 
   group('HttpUtils.validateRedirectTargetForTesting (downgrade rejection)', () {
     test('rejects an https->http downgrade redirect', () {

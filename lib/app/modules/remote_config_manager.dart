@@ -20,7 +20,7 @@ import 'package:karing/app/utils/path_utils.dart';
 // install of this app before this change (never fetched over the
 // network by this build).
 class RemoteConfigManager {
-  static RemoteConfig _config = RemoteConfig();
+  static final RemoteConfig _config = RemoteConfig();
 
   static Future<void> init() async {
     await _loadConfig();

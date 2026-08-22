@@ -71,38 +71,26 @@ void main() {
       });
     }
 
-    test(
-      'RemoteConfigManager starts with only this app\'s own hardcoded '
-      'defaults, never previously-fetched Karing data',
-      () {
-        final config = RemoteConfigManager.getConfig();
-        // No cached "latest_check" timestamp -- proves nothing has ever
-        // run a check-and-save cycle against this fresh instance.
-        expect(config.latestCheck, isEmpty);
-      },
-    );
+    test('RemoteConfigManager starts with only this app\'s own hardcoded '
+        'defaults, never previously-fetched Karing data', () {
+      final config = RemoteConfigManager.getConfig();
+      // No cached "latest_check" timestamp -- proves nothing has ever
+      // run a check-and-save cycle against this fresh instance.
+      expect(config.latestCheck, isEmpty);
+    });
 
-    test(
-      'AutoUpdateManager never has a pending update to install without a '
-      'network check ever having run',
-      () {
-        final versionCheck = AutoUpdateManager.getVersionCheck();
-        expect(versionCheck.newVersion, isFalse);
-        expect(versionCheck.version, isEmpty);
-        expect(versionCheck.url, isEmpty);
-      },
-    );
+    test('AutoUpdateManager never has a pending update to install without a '
+        'network check ever having run', () {
+      final versionCheck = AutoUpdateManager.getVersionCheck();
+      expect(versionCheck.newVersion, isFalse);
+      expect(versionCheck.version, isEmpty);
+      expect(versionCheck.url, isEmpty);
+    });
 
-    test(
-      'NoticeManager/BoardProviderNoticeManager start with no notices '
-      '(nothing populates them without a network fetch)',
-      () {
-        expect(NoticeManager.getNotices().single.items, isEmpty);
-        expect(
-          BoardProviderNoticeManager.getNotices().single.items,
-          isEmpty,
-        );
-      },
-    );
+    test('NoticeManager/BoardProviderNoticeManager start with no notices '
+        '(nothing populates them without a network fetch)', () {
+      expect(NoticeManager.getNotices().single.items, isEmpty);
+      expect(BoardProviderNoticeManager.getNotices().single.items, isEmpty);
+    });
   });
 }
