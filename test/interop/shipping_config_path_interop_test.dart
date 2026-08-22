@@ -68,8 +68,7 @@ class _FakeVpnCorePlatform extends VpnCorePlatform {
   Future<String> coreVersion() async => '1.13.19';
 
   @override
-  Future<List<String>> getSanitizedLogs({int maxLines = 200}) async =>
-      const [];
+  Future<List<String>> getSanitizedLogs({int maxLines = 200}) async => const [];
 }
 
 void main() {
@@ -86,87 +85,85 @@ void main() {
     }
   });
 
-  test(
-    'the exact document VPNService.start() sends for a real subscription '
-    'passes sing-box v1.13.19 check',
-    () async {
-      if (singBoxBin == null) {
-        markTestSkipped('sing-box binary not available.');
-        return;
-      }
+  test('the exact document VPNService.start() sends for a real subscription '
+      'passes sing-box v1.13.19 check', () async {
+    if (singBoxBin == null) {
+      markTestSkipped('sing-box binary not available.');
+      return;
+    }
 
-      final fake = _FakeVpnCorePlatform();
-      VpnCorePlatform.instance = fake;
-      await FlutterVpnService.core.initialize();
+    final fake = _FakeVpnCorePlatform();
+    VpnCorePlatform.instance = fake;
+    await FlutterVpnService.core.initialize();
 
-      final group = ServerConfigGroupItem()
-        ..groupid = 'g1'
-        ..type = SubscriptionLinkType.singbox;
-      final subscription = jsonEncode({
-        'outbounds': [
-          {
-            'type': 'vless',
-            'tag': 'reality-node',
-            'server': 'example.invalid',
-            'server_port': 443,
-            'uuid': _testUuid,
-            'flow': 'xtls-rprx-vision',
-            'tls': {
+    final group = ServerConfigGroupItem()
+      ..groupid = 'g1'
+      ..type = SubscriptionLinkType.singbox;
+    final subscription = jsonEncode({
+      'outbounds': [
+        {
+          'type': 'vless',
+          'tag': 'reality-node',
+          'server': 'example.invalid',
+          'server_port': 443,
+          'uuid': _testUuid,
+          'flow': 'xtls-rprx-vision',
+          'tls': {
+            'enabled': true,
+            'server_name': 'example.invalid',
+            'utls': {'enabled': true, 'fingerprint': 'chrome'},
+            'reality': {
               'enabled': true,
-              'server_name': 'example.invalid',
-              'utls': {'enabled': true, 'fingerprint': 'chrome'},
-              'reality': {
-                'enabled': true,
-                'public_key': _testPublicKey,
-                'short_id': _testShortId,
-              },
+              'public_key': _testPublicKey,
+              'short_id': _testShortId,
             },
           },
-          {'type': 'direct', 'tag': 'direct-out'},
-          {'type': 'block', 'tag': 'block-out'},
-        ],
-      });
-      final err = await AutoConfUtils.tryConvert(
-        'https://example.invalid/sub',
-        false,
-        false,
-        group,
-        const [],
-        null,
-        RemoteContent()..text = subscription,
-      );
-      expect(err, isNull);
+        },
+        {'type': 'direct', 'tag': 'direct-out'},
+        {'type': 'block', 'tag': 'block-out'},
+      ],
+    });
+    final err = await AutoConfUtils.tryConvert(
+      'https://example.invalid/sub',
+      false,
+      false,
+      group,
+      const [],
+      null,
+      RemoteContent()..text = subscription,
+    );
+    expect(err, isNull);
 
-      final selected = group.getByTag('reality-node')!;
-      await VPNService.setServer(
-        selected,
-        VPNServiceSetServerOptions(),
-        SingboxExportType.karing,
-        null,
-        '',
-        '',
-      );
-      await VPNService.start(8000);
+    final selected = group.getByTag('reality-node')!;
+    await VPNService.setServer(
+      selected,
+      VPNServiceSetServerOptions(),
+      SingboxExportType.karing,
+      null,
+      '',
+      '',
+    );
+    await VPNService.start(8000);
 
-      final captured = fake.lastConfig;
-      expect(captured, isNotNull);
+    final captured = fake.lastConfig;
+    expect(captured, isNotNull);
 
-      final workDir = await Directory.systemTemp.createTemp(
-        'app_shipping_path_check_',
+    final workDir = await Directory.systemTemp.createTemp(
+      'app_shipping_path_check_',
+    );
+    try {
+      final path = '${workDir.path}/shipping_config.json';
+      await File(path).writeAsString(captured!.singBoxConfigJson);
+      final result = await Process.run(singBoxBin!, ['check', '-c', path]);
+      expect(
+        result.exitCode,
+        0,
+        reason:
+            'sing-box check rejected the real app-path document: '
+            '${result.stderr}',
       );
-      try {
-        final path = '${workDir.path}/shipping_config.json';
-        await File(path).writeAsString(captured!.singBoxConfigJson);
-        final result = await Process.run(singBoxBin!, ['check', '-c', path]);
-        expect(
-          result.exitCode,
-          0,
-          reason: 'sing-box check rejected the real app-path document: '
-              '${result.stderr}',
-        );
-      } finally {
-        await workDir.delete(recursive: true).catchError((_) => workDir);
-      }
-    },
-  );
+    } finally {
+      await workDir.delete(recursive: true).catchError((_) => workDir);
+    }
+  });
 }

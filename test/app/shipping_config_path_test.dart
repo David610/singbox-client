@@ -56,13 +56,12 @@ class _FakeVpnCorePlatform extends VpnCorePlatform {
   }
 
   @override
-  Future<VpnCoreStatus> status() async =>
-      lastConfig == null
-          ? VpnCoreStatus.disconnected
-          : VpnCoreStatus(
-            state: VpnCoreState.connected,
-            activeTag: lastConfig!.tag,
-          );
+  Future<VpnCoreStatus> status() async => lastConfig == null
+      ? VpnCoreStatus.disconnected
+      : VpnCoreStatus(
+          state: VpnCoreState.connected,
+          activeTag: lastConfig!.tag,
+        );
 
   @override
   Stream<VpnCoreStatus> statusStream() => _controller.stream;
@@ -71,8 +70,7 @@ class _FakeVpnCorePlatform extends VpnCorePlatform {
   Future<String> coreVersion() async => '1.13.19';
 
   @override
-  Future<List<String>> getSanitizedLogs({int maxLines = 200}) async =>
-      const [];
+  Future<List<String>> getSanitizedLogs({int maxLines = 200}) async => const [];
 }
 
 // Fake, syntactically-valid test-only credentials -- never real ones.
