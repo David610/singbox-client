@@ -75,12 +75,17 @@ class RemoteConfigDonate {
 }
 
 class RemoteConfig {
+  // NOTE: this class is a pure local data holder / set of documented
+  // first-party-app default links now -- nothing in this app fetches a
+  // remote config from `dot.karing.app` anymore (see
+  // remote_config_manager.dart). The fields below that still default to
+  // karing.app / x31415926.top URLs are only ever surfaced as
+  // user-tapped "open this link" buttons (Get Traffic, FAQ, Telegram,
+  // Rulesets, etc.) -- never fetched automatically. Karing's own
+  // remote-config/notice/autoupdate/telemetry ("outpost") endpoints and
+  // the fields that only ever fed those silent background requests were
+  // removed rather than repointed.
   static const String kDefaultHost = "karing.app";
-  static const String kDefaultNotice = "https://dot.$kDefaultHost/notice2.json";
-  static const String kDefaultConfig = "https://dot.$kDefaultHost/config.json";
-  static const String kDefaultAutoUpdate =
-      "https://dot.$kDefaultHost/autoupdate.json";
-  static const String kDefaultOutpost = "https://outpost.$kDefaultHost/put";
   static const String kDefaultGetTranffic = "https://2.x31415926.top/";
   static const String kDefaultGetTranfficFrom = "";
   static const String kDefaultTutorial = "https://$kDefaultHost/quickstart/";
@@ -108,17 +113,10 @@ class RemoteConfig {
   String latestCheck = "";
   List<String> forwards = [];
   List<String> nowarp = ["us", "cn", "ru"];
-  String analyticsMinVersion = "";
-  bool ispBindNeedConnect = true;
-  String ispPanelJs = "";
   List<String> faqAnchor = [];
   List<RemoteConfigGetProfile> getProfile = [];
   List<RemoteConfigChannel> channels = [];
   String host = kDefaultHost;
-  String notice = kDefaultNotice;
-  String config = kDefaultConfig;
-  String autoUpdate = kDefaultAutoUpdate;
-  String outpost = kDefaultOutpost;
 
   String getTranffic = kDefaultGetTranffic;
   String getTranfficFrom = kDefaultGetTranfficFrom;
@@ -143,9 +141,6 @@ class RemoteConfig {
       'latest_check': latestCheck,
       'forwards': forwards,
       'nowarp': nowarp,
-      "analytics_min_version": analyticsMinVersion,
-      "isp_bind_need_connect": ispBindNeedConnect,
-      "isp_panel_js": ispPanelJs,
       'faq_anchor': faqAnchor,
       "get_profile": getProfile,
       "channel": channels,
@@ -220,8 +215,6 @@ class RemoteConfig {
       "cn",
       "ru",
     ])!;
-
-    analyticsMinVersion = map["analytics_min_version"] ?? "";
 
     faqAnchor = ConvertUtils.getListStringFromDynamic(
       map["faq_anchor"],

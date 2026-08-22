@@ -1,82 +1,35 @@
 // ignore_for_file: empty_catches, unused_catch_stack
 
-import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:karing/app/local_services/vpn_service.dart';
 import 'package:karing/app/modules/remote_config.dart';
-import 'package:karing/app/modules/setting_manager.dart';
-import 'package:karing/app/runtime/return_result.dart';
-import 'package:karing/app/utils/app_lifecycle_state_notify.dart';
-import 'package:karing/app/utils/app_utils.dart';
-import 'package:karing/app/utils/auto_update_utils.dart';
-import 'package:karing/app/utils/did.dart';
-import 'package:karing/app/utils/file_saver.dart';
-import 'package:karing/app/utils/log.dart';
 import 'package:karing/app/utils/path_utils.dart';
-import 'package:karing/app/utils/platform_utils.dart';
-import 'package:karing/app/utils/version_compare_utils.dart';
-import 'package:karing/app/modules/vpn_service_state.dart';
 
+// This used to be the app's Karing remote-config client: on every
+// startup, VPN connect, app resume, and (on desktop) every 30 minutes it
+// silently fetched `https://dot.karing.app/config.json`, a third-party
+// control-plane endpoint that could remotely steer this app's donate
+// links, "get traffic" URL, ruleset source hosts, etc. That entire
+// automatic fetch has been removed rather than repointed at a
+// placeholder -- it was not required for VPN start/import/connect, and
+// nothing in this app should silently phone home to Karing's
+// infrastructure. `getConfig()` now only ever returns this app's own
+// hardcoded first-party defaults (`RemoteConfig`'s field initializers),
+// optionally overlaid with whatever was cached on disk from a previous
+// install of this app before this change (never fetched over the
+// network by this build).
 class RemoteConfigManager {
-  static final List<void Function()> onEventCheck = [];
-  static Timer? _timerChecker;
-  static bool _checking = false;
-  static final FileSaver _fileSaver = FileSaver();
-  static Duration _duration = const Duration(hours: 1);
   static RemoteConfig _config = RemoteConfig();
 
   static Future<void> init() async {
-    _fileSaver.setSavePath(await PathUtils.remoteConfigFilePath());
     await _loadConfig();
-    VPNService.onEventStateChanged.add((
-      FlutterVpnServiceState state,
-      Map<String, String> params,
-    ) async {
-      if (state == FlutterVpnServiceState.connected) {
-        Future.delayed(const Duration(seconds: 3), () async {
-          _check();
-        });
-      }
-    });
-    AppLifecycleStateNofity.onStateResumed(null, () {
-      Future.delayed(const Duration(seconds: 3), () async {
-        _check();
-      });
-    });
-    bool first = await Did.getFirstTime();
-    Duration duration = first
-        ? const Duration(milliseconds: 10)
-        : const Duration(seconds: 3);
-    Future.delayed(duration, () async {
-      _check();
-    });
-    if (PlatformUtils.isPC()) {
-      _timerChecker = Timer.periodic(const Duration(minutes: 30), (timer) {
-        _check();
-      });
-    }
   }
 
-  static Future<void> uninit() async {
-    _timerChecker?.cancel();
-    _timerChecker = null;
-  }
+  static Future<void> uninit() async {}
 
   static RemoteConfig getConfig() {
     return _config;
-  }
-
-  static bool rejectAnalyticsSubmit() {
-    var minVersion = _config.analyticsMinVersion;
-    if (minVersion.isNotEmpty) {
-      String version = AppUtils.getBuildinVersion();
-      if (VersionCompareUtils.compareVersion(version, minVersion) < 0) {
-        return true;
-      }
-    }
-    return false;
   }
 
   static Future<void> _loadConfig() async {
@@ -93,60 +46,5 @@ class RemoteConfigManager {
         _config.fromJson(config);
       }
     } catch (err, stacktrace) {}
-  }
-
-  static Future<void> _saveConfig() async {
-    await _fileSaver.saveAsJson(_config);
-  }
-
-  static Future<void> _check() async {
-    if (_checking) {
-      return;
-    }
-    if (SettingManager.getConfig().updateWhenConnected) {
-      final started = await VPNService.getStarted();
-      if (!started) {
-        return;
-      }
-    }
-
-    var last = DateTime.tryParse(_config.latestCheck);
-    DateTime now = DateTime.now();
-    if (last != null) {
-      Duration dur = now.difference(last);
-      if (dur.inSeconds < _duration.inSeconds) {
-        return;
-      }
-    }
-    _config.latestCheck = now.toString();
-    _checking = true;
-    try {
-      ReturnResult<RemoteConfig> gConfig =
-          await AutoupdateUtils.getRemoteConfig(
-            SettingManager.getConfig().updateWhenConnected,
-          );
-      if (gConfig.error != null) {
-        _checking = false;
-        _duration = const Duration(minutes: 10);
-        return;
-      }
-      _duration = const Duration(hours: 1);
-      _config = gConfig.data!;
-      _config.latestCheck = now.toString();
-
-      _saveConfig();
-      Future.delayed(const Duration(milliseconds: 300), () async {
-        for (var callback in onEventCheck) {
-          callback();
-        }
-      });
-    } catch (err, _) {
-      Log.w("RemoteConfigManager._check exception ${err.toString()}");
-    }
-
-    _checking = false;
-    Future.delayed(_duration, () async {
-      await _check();
-    });
   }
 }
