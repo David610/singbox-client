@@ -64,7 +64,6 @@ import 'package:karing/screens/my_profiles_screen.dart';
 import 'package:karing/screens/net_check_screen.dart';
 import 'package:karing/screens/net_connections_screen.dart';
 import 'package:karing/screens/novice_screen.dart';
-import 'package:karing/screens/perapp_android_screen.dart';
 import 'package:karing/screens/region_settings_screen.dart';
 import 'package:karing/screens/richtext_viewer.screen.dart';
 import 'package:karing/screens/scheme_handler.dart';
@@ -170,9 +169,6 @@ class _HomeScreenState extends LasyRenderingState<HomeScreen>
   );
   final FocusNode _focusNodeAddProfile = FocusNode(
     debugLabel: "scroll.${AddProfileCard.id()}",
-  );
-  final FocusNode _focusNodePerApp = FocusNode(
-    debugLabel: "scroll.${PerAppCard.id()}",
   );
   final FocusNode _focusNodeDns = FocusNode(
     debugLabel: "scroll.${DNSCard.id()}",
@@ -334,7 +330,6 @@ class _HomeScreenState extends LasyRenderingState<HomeScreen>
         null,
         _focusNodeAddProfile,
       ),
-      perapp: HomeWidgetCard0Options(onTapPerApp, null, _focusNodePerApp),
       dns: HomeWidgetCard0Options(onTapDNS, null, _focusNodeDns),
       diversion: HomeWidgetCard0Options(
         onTapDiversion,
@@ -1689,30 +1684,6 @@ class _HomeScreenState extends LasyRenderingState<HomeScreen>
     setState(() {});
   }
 
-  void onTapPerApp() async {
-    bool tunMode = await VPNService.getTunMode();
-    if (!tunMode) {
-      return;
-    }
-    if (Platform.isAndroid) {
-      await Navigator.push(
-        context,
-        MaterialPageRoute(
-          settings: PerAppAndroidScreen.routSettings(),
-          builder: (context) => const PerAppAndroidScreen(),
-        ),
-      );
-    } /*else if (Platform.isMacOS) {
-      await Navigator.push(
-          context,
-          MaterialPageRoute(
-              settings: PerAppMacosScreen.routSettings(),
-              builder: (context) => const PerAppMacosScreen()));
-    }*/
-    await checkAndReload("onTapPerApp");
-    setState(() {});
-  }
-
   void onTapDNS() async {
     await GroupHelper.showDns(context);
     await checkAndReload("onTapDNS");
@@ -2396,7 +2367,6 @@ class _HomeScreenState extends LasyRenderingState<HomeScreen>
     _focusNodeSystemProxy.dispose();
     _focusNodeMyProfiles.dispose();
     _focusNodeAddProfile.dispose();
-    _focusNodePerApp.dispose();
     _focusNodeDns.dispose();
     _focusNodeDiversion.dispose();
     _focusNodeDiversionRules.dispose();

@@ -497,7 +497,6 @@ class HomeWidgetOptions {
 
   HomeWidgetCard0Options? myProfiles;
   HomeWidgetCard0Options? addProfile;
-  HomeWidgetCard0Options? perapp;
   HomeWidgetCard0Options? dns;
   HomeWidgetCard0Options? diversion;
   HomeWidgetCard0Options? diversionRules;
@@ -526,7 +525,6 @@ class HomeWidgetOptions {
     this.systemProxy,
     this.myProfiles,
     this.addProfile,
-    this.perapp,
     this.dns,
     this.diversion,
     this.diversionRules,
@@ -554,7 +552,6 @@ class HomeWidgetOptions {
     focusToKeys[systemProxy?.focusNode] = systemProxy?.key;
     focusToKeys[myProfiles?.focusNode] = myProfiles?.key;
     focusToKeys[addProfile?.focusNode] = addProfile?.key;
-    focusToKeys[perapp?.focusNode] = perapp?.key;
     focusToKeys[dns?.focusNode] = dns?.key;
     focusToKeys[diversion?.focusNode] = diversion?.key;
     focusToKeys[diversionRules?.focusNode] = diversionRules?.key;
@@ -1377,31 +1374,6 @@ class AddProfileCard extends TextCard0 {
 
 class _AddProfileCardState extends TextCard0State<AddProfileCard> {}
 
-class PerAppCard extends TextCard0 {
-  PerAppCard({super.key, super.onPressed, super.onLongPress, super.focusNode})
-    : super(
-        icon: Icons.merge_type_outlined,
-        title: t.PerAppAndroidScreen.title,
-      );
-
-  @override
-  State<PerAppCard> createState() => _PerAppCardState();
-
-  static bool supportedCurrentPlatfrom() {
-    return PlatformUtils.android;
-  }
-
-  static String id() {
-    return "perapp";
-  }
-
-  static int crossAxisCellCount() {
-    return 4;
-  }
-}
-
-class _PerAppCardState extends TextCard0State<PerAppCard> {}
-
 class DNSCard extends TextCard0 {
   DNSCard({super.key, super.onPressed, super.onLongPress, super.focusNode})
     : super(icon: Icons.dns_outlined, title: t.meta.dns);
@@ -1915,9 +1887,6 @@ class HomeWidgets {
     if (AddProfileCard.supportedCurrentPlatfrom()) {
       ids.add(AddProfileCard.id());
     }
-    if (PerAppCard.supportedCurrentPlatfrom()) {
-      ids.add(PerAppCard.id());
-    }
     if (DNSCard.supportedCurrentPlatfrom()) {
       ids.add(DNSCard.id());
     }
@@ -1998,9 +1967,6 @@ class HomeWidgets {
     }
     if (AddProfileCard.id() == id) {
       return Icons.add_outlined;
-    }
-    if (PerAppCard.id() == id) {
-      return Icons.merge_type_outlined;
     }
     if (DNSCard.id() == id) {
       return Icons.dns_outlined;
@@ -2083,9 +2049,6 @@ class HomeWidgets {
     if (AddProfileCard.id() == id) {
       return t.meta.addProfile;
     }
-    if (PerAppCard.id() == id) {
-      return t.PerAppAndroidScreen.title;
-    }
     if (DNSCard.id() == id) {
       return t.meta.dns;
     }
@@ -2155,9 +2118,6 @@ class HomeWidgets {
     }
     if (AddProfileCard.supportedCurrentPlatfrom()) {
       ids.add(AddProfileCard.id());
-    }
-    if (PerAppCard.supportedCurrentPlatfrom()) {
-      ids.add(PerAppCard.id());
     }
     if (DNSCard.supportedCurrentPlatfrom()) {
       ids.add(DNSCard.id());
@@ -2422,20 +2382,6 @@ class HomeWidgets {
           onPressed: options.addProfile!.onPressed,
           onLongPress: options.addProfile!.onLongPress,
           focusNode: options.addProfile!.focusNode,
-        ),
-      );
-    }
-    if (PerAppCard.id() == id &&
-        options.perapp != null &&
-        PerAppCard.supportedCurrentPlatfrom()) {
-      return GridItem(
-        crossAxisCellCount: PerAppCard.crossAxisCellCount(),
-        id: id,
-        child: PerAppCard(
-          key: options.perapp!.key,
-          onPressed: options.perapp!.onPressed,
-          onLongPress: options.perapp!.onLongPress,
-          focusNode: options.perapp!.focusNode,
         ),
       );
     }

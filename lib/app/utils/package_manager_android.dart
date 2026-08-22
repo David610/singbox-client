@@ -19,8 +19,8 @@ class PackageInfoEx {
 
 /// Minimal, real (not fabricated) `PackageInfo` for a placeholder entry --
 /// used when a previously-selected package is no longer installed (see
-/// perapp_android_screen.dart/packageid_multi_select_android_screen.dart's
-/// "removed app" placeholder row). `android_package_manager`'s own
+/// packageid_multi_select_android_screen.dart's "removed app" placeholder
+/// row). `android_package_manager`'s own
 /// `PackageInfoImpl` is internal to that package (not exported), so this
 /// is this app's own minimal implementation of the same public
 /// `PackageInfo` contract.

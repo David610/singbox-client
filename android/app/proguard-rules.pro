@@ -25,7 +25,6 @@
 -keep class io.flutter.view.**  { *; }
 -keep class io.flutter.**  { *; }
 -keep class io.flutter.plugins.**  { *; }
--keep class io.nebula.vpn_service.**  { *; }
 -keep class com.david610.singboxclient.**  { *; }
 -dontwarn com.google.android.play.core.splitcompat.SplitCompatApplication
 -dontwarn com.google.android.play.core.splitinstall.SplitInstallException
