@@ -24,6 +24,21 @@ public class VpnCorePlugin: NSObject, FlutterPlugin {
     // exists to prevent for the single-call case.
     private var operationInFlight = false
 
+    /// How long `restart` waits for the previous tunnel instance to reach
+    /// `.disconnected`/`.invalid` before failing deterministically (see
+    /// `waitForDisconnect` below). Not derived from any measured teardown
+    /// latency -- there is no telemetry in this repo's history for how
+    /// long a real device's NEPacketTunnelProvider teardown takes -- this
+    /// is the same conservative default introduced with the original
+    /// restart-race fix and kept unchanged (see git history: "Fix
+    /// log-credential leak, unguarded VPN broadcast receiver, iOS restart
+    /// race" and "Re-harden PR #6 iOS restart lifecycle against
+    /// concurrency and stuck-timeout races"). Named here, rather than left
+    /// as a bare default-parameter literal, so a future change has
+    /// somewhere to record its own justification instead of silently
+    /// editing an unexplained `= 5`.
+    private static let restartDisconnectTimeout: TimeInterval = 5
+
     private func beginOperation() -> Bool {
         if operationInFlight { return false }
         operationInFlight = true
@@ -218,7 +233,8 @@ public class VpnCorePlugin: NSObject, FlutterPlugin {
     /// `stopVPNTunnel()` (see call sites), so a status change that happens
     /// immediately after `stopVPNTunnel()` is called can never be missed.
     private func waitForDisconnect(
-        of connection: NEVPNConnection, timeout: TimeInterval = 5, completion: @escaping (Bool) -> Void
+        of connection: NEVPNConnection, timeout: TimeInterval = restartDisconnectTimeout,
+        completion: @escaping (Bool) -> Void
     ) {
         var observer: NSObjectProtocol?
         var didComplete = false
