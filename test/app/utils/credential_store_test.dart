@@ -16,8 +16,10 @@ class MemoryBackend implements CredentialBackend {
 
   @override
   Future<String?> read(String key) async => values[key];
+
   @override
   Future<Map<String, String>> readAll() async => Map.of(values);
+
   @override
   Future<void> write(String key, String value) async {
     if (throwOnWrite) throw StateError('platform secure store unavailable');

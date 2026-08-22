@@ -10,8 +10,11 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 /// Apple platforms by Keychain. JSON files contain only opaque references.
 abstract interface class CredentialBackend {
   Future<void> write(String key, String value);
+
   Future<String?> read(String key);
+
   Future<void> delete(String key);
+
   Future<Map<String, String>> readAll();
 }
 
@@ -24,17 +27,22 @@ final class PlatformCredentialBackend implements CredentialBackend {
   @override
   Future<void> write(String key, String value) =>
       _storage.write(key: key, value: value);
+
   @override
   Future<String?> read(String key) => _storage.read(key: key);
+
   @override
   Future<void> delete(String key) => _storage.delete(key: key);
+
   @override
   Future<Map<String, String>> readAll() => _storage.readAll();
 }
 
 class CredentialStoreException implements Exception {
   const CredentialStoreException(this.message);
+
   final String message;
+
   @override
   String toString() => 'CredentialStoreException: $message';
 }
@@ -50,6 +58,7 @@ class ProfileCredentialStore {
 
   final CredentialBackend backend;
   final String namespace;
+
   String get _storagePrefix => 'singbox-client.$namespace.v1.';
 
   static const _secretKeys = {
@@ -196,6 +205,7 @@ class ProfileCredentialStore {
 
   Future<void> _deleteUnreferenced(Map<String, dynamic> protected) async {
     final referenced = <String>{};
+
     void collect(Object? value) {
       if (value is Map) value.values.forEach(collect);
       if (value is List) value.forEach(collect);
