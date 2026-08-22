@@ -461,6 +461,7 @@ class ServerManager {
   static final ServerUse _use = ServerUse();
 
   static final FileSaver _fileSaverUse = FileSaver();
+  static final FileSaver _fileSaverServerConfig = FileSaver();
   static final FileSaver _fileSaverDiversionGroupConfig = FileSaver();
   static bool _updatingSubscription = false;
   static bool _updateLatencyByHistory = false;
@@ -470,6 +471,7 @@ class ServerManager {
 
   static Future<void> init() async {
     _fileSaverUse.setSavePath(await PathUtils.subscribeUseFilePath());
+    _fileSaverServerConfig.setSavePath(await PathUtils.subscribeFilePath());
     _fileSaverDiversionGroupConfig.setSavePath(
       await PathUtils.diversionGroupFilePath(),
     );
@@ -954,9 +956,7 @@ class ServerManager {
     try {
       content = await File(filePath).readAsString();
       if (content.isNotEmpty) {
-        var config = await ProfileCredentialStore(
-          PlatformCredentialBackend(),
-        ).readAndMigrate(File(filePath));
+        var config = jsonDecode(content);
         _serverConfig.fromJson(config);
         int index = 0;
         for (var item in _serverConfig.items) {
@@ -975,13 +975,202 @@ class ServerManager {
         "ServerManager.loadServerConfig exception $filePath ${err.toString()}",
       );
     }
+    await _hydrateSecureCredentials();
+  }
+
+  /// Fills in `server.raw` / `group.urlOrPath` for entries that were
+  /// migrated to secure storage (only `secret_ref`/`url_secret_ref` present
+  /// on disk, no inline plaintext). Entries that still carry an inline
+  /// plaintext copy (pre-migration `subscribe.json`, or a prior secure
+  /// write that never completed) are left as-is here -- `saveServerConfig`
+  /// migrates them the next time the config is saved, which is what keeps
+  /// this migration non-destructive: nothing is deleted or blocked from
+  /// working just because it hasn't been migrated yet.
+  ///
+  /// A missing or corrupted secure-store entry never throws: the affected
+  /// server/group is left without its credential (`raw` stays null /
+  /// `urlOrPath` stays empty), which fails that one profile closed
+  /// (`ServerManager._configFor`/`VPNService.setServer` refuse to build a
+  /// tunnel without an outbound) rather than crashing the app or silently
+  /// falling back to an unauthenticated/plaintext connection.
+  static Future<void> _hydrateSecureCredentials() =>
+      hydrateSecureCredentialsFor(_serverConfig);
+
+  /// Same logic as the private wrapper above, parameterized on an explicit
+  /// [ServerConfig] instead of the module's static `_serverConfig` so it
+  /// can be unit-tested against an in-memory config with no file I/O
+  /// (`ServerManager.loadServerConfig` is the only real caller and always
+  /// passes `_serverConfig`). Public and `@visibleForTesting` rather than
+  /// private specifically so test/app/modules/*_test.dart can call it.
+  @visibleForTesting
+  static Future<void> hydrateSecureCredentialsFor(ServerConfig config) async {
+    for (var group in config.items) {
+      if (group.urlOrPath.isEmpty &&
+          group.urlSecretRef.isNotEmpty) {
+        try {
+          final value = await CredentialStore.readSubscriptionSecret(
+            group.urlSecretRef,
+          );
+          if (value != null && value.isNotEmpty) {
+            group.urlOrPath = value;
+          } else {
+            Log.w(
+              'ServerManager: no secure subscription URL found for group '
+              '"${group.groupid}" (ref ${group.urlSecretRef})',
+            );
+          }
+        } catch (err) {
+          Log.w(
+            'ServerManager: corrupted secure subscription URL for group '
+            '"${group.groupid}" (ref ${group.urlSecretRef}): ${err.toString()}',
+          );
+        }
+      }
+      for (var server in group.servers) {
+        if (server.raw != null || server.secretRef.isEmpty) continue;
+        try {
+          final payload = await CredentialStore.readServerSecret(
+            server.secretRef,
+          );
+          if (payload == null || payload.isEmpty) {
+            Log.w(
+              'ServerManager: no secure credential found for server '
+              '"${server.tag}" (ref ${server.secretRef})',
+            );
+            continue;
+          }
+          final decoded = jsonDecode(payload);
+          if (decoded is Map) {
+            server.raw = Map<String, dynamic>.from(decoded);
+          }
+        } catch (err) {
+          Log.w(
+            'ServerManager: corrupted secure credential for server '
+            '"${server.tag}" (ref ${server.secretRef}): ${err.toString()}',
+          );
+        }
+      }
+    }
   }
 
   static Future<void> saveServerConfig() async {
-    final file = File(await PathUtils.subscribeFilePath());
-    await ProfileCredentialStore(
-      PlatformCredentialBackend(),
-    ).write(file, _serverConfig.toJson());
+    final json = await buildSecureServerConfigJsonFor(_serverConfig);
+    await _fileSaverServerConfig.saveAsJson(json);
+  }
+
+  /// Builds the JSON document written to `subscribe.json`, moving
+  /// credential-bearing fields (`ProxyConfig.raw`, a remote group's
+  /// `urlOrPath`) into `CredentialStore` (Android Keystore / iOS Keychain)
+  /// and replacing them in the on-disk document with a stable `secret_ref`
+  /// / `url_secret_ref` id instead.
+  ///
+  /// Fail-safe by construction: a secret is only removed from the returned
+  /// JSON after `CredentialStore.writeAndVerify` has confirmed the exact
+  /// value round-trips through secure storage. If the platform secure
+  /// store is unavailable or the verify read doesn't match, the plaintext
+  /// value is left in the JSON untouched (same behavior as before this
+  /// migration existed) rather than losing the credential -- a profile is
+  /// never corrupted or made unusable by a failed migration attempt.
+  ///
+  /// Idempotent: an already-migrated server/group keeps its existing
+  /// `secretRef`/`urlSecretRef` (the live in-memory object is updated, not
+  /// just the returned JSON), so repeated saves reuse the same secure-store
+  /// key instead of leaking a fresh orphaned entry on every save. Orphaned
+  /// keys (a profile that was migrated and then deleted/replaced) are
+  /// pruned via `CredentialStore.pruneExcept` after every save.
+  @visibleForTesting
+  static Future<Map<String, dynamic>> buildSecureServerConfigJsonFor(
+    ServerConfig config,
+  ) async {
+    final Set<String> activeServerRefs = {};
+    final Set<String> activeSubscriptionRefs = {};
+    final List<dynamic> groupsJson = [];
+
+    for (var group in config.items) {
+      final Map<String, dynamic> groupJson = Map<String, dynamic>.from(
+        group.toJson(),
+      );
+
+      if (group.isRemote() && group.urlOrPath.isNotEmpty) {
+        String ref = group.urlSecretRef.isNotEmpty
+            ? group.urlSecretRef
+            : const Uuid().v4();
+        final ok = await CredentialStore.writeAndVerify(
+          CredentialStore.subscriptionSecretPrefix,
+          ref,
+          group.urlOrPath,
+        );
+        if (ok) {
+          group.urlSecretRef = ref;
+          activeSubscriptionRefs.add(ref);
+          groupJson['url_secret_ref'] = ref;
+          groupJson['url_or_path'] = '';
+        } else {
+          Log.w(
+            'ServerManager: secure storage unavailable, keeping subscription '
+            'URL for group "${group.groupid}" in local plaintext storage',
+          );
+          if (group.urlSecretRef.isNotEmpty) {
+            activeSubscriptionRefs.add(group.urlSecretRef);
+          }
+        }
+      } else if (group.urlSecretRef.isNotEmpty) {
+        activeSubscriptionRefs.add(group.urlSecretRef);
+      }
+
+      final List<dynamic> serversJson = [];
+      for (var server in group.servers) {
+        final Map<String, dynamic> serverJson = Map<String, dynamic>.from(
+          server.toJson(),
+        );
+        final raw = server.raw;
+        if (raw != null) {
+          String ref = server.secretRef.isNotEmpty
+              ? server.secretRef
+              : const Uuid().v4();
+          final ok = await CredentialStore.writeAndVerify(
+            CredentialStore.serverSecretPrefix,
+            ref,
+            jsonEncode(raw),
+          );
+          if (ok) {
+            server.secretRef = ref;
+            activeServerRefs.add(ref);
+            serverJson['secret_ref'] = ref;
+            serverJson.remove('raw');
+          } else {
+            Log.w(
+              'ServerManager: secure storage unavailable, keeping credential '
+              'for server "${server.tag}" in local plaintext storage',
+            );
+            if (server.secretRef.isNotEmpty) {
+              activeServerRefs.add(server.secretRef);
+            }
+          }
+        } else if (server.secretRef.isNotEmpty) {
+          activeServerRefs.add(server.secretRef);
+        }
+        serversJson.add(serverJson);
+      }
+      groupJson['servers'] = serversJson;
+      groupsJson.add(groupJson);
+    }
+
+    // Best-effort cleanup of secrets left behind by deleted/replaced
+    // profiles. `pruneExcept` itself never throws, so this can never fail
+    // the save -- it is awaited (rather than fire-and-forget) only so the
+    // cleanup is deterministically finished by the time this call returns,
+    // which is what makes it possible to assert on it in tests.
+    await CredentialStore.pruneExcept(
+      CredentialStore.serverSecretPrefix,
+      activeServerRefs,
+    );
+    await CredentialStore.pruneExcept(
+      CredentialStore.subscriptionSecretPrefix,
+      activeSubscriptionRefs,
+    );
+
+    return {'items': groupsJson};
   }
 
   static Future<void> loadDiversionGroupConfig() async {
