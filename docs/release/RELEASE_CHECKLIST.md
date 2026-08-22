@@ -67,14 +67,17 @@ Per this task's requirement, a release requires all of:
 | iOS build green | `ios-debug-smoke` then `ios-release-build` | Unsigned-build smoke test, then the real signed release build |
 
 **Read `docs/CI.md` "Known current-state gaps" before treating any of
-this as a checklist you can blindly trust once green.** As of this
-writing, `android-debug-smoke`/`ios-debug-smoke` (and therefore the whole
-release pipeline) are expected to be genuinely red, because
-`lib/app/utils/` and `VPNService`/`ProxyConfig`/`ServerConfig` are not
-yet reconstructed in this fork (`docs/ARCHITECTURE.md` §9). This release
-pipeline does not — and must not — lower that bar to force a green
-release; it inherits the same honest red state until that separate
-reconstruction work lands.
+this as a checklist you can blindly trust once green.** UPDATE (verified
+against `origin/main` as of this document's own device-readiness audit,
+`docs/CI.md`'s "Known current-state gaps" items 1-2): `lib/app/utils/`,
+`VPNService`/`ProxyConfig`/`ServerConfig`, and the iOS `PacketTunnel`
+Xcode target registration were all reconstructed and landed in earlier
+commits (PR #2, PR #3) — `android-debug-smoke`/`ios-debug-smoke` are no
+longer expected to be red on that account. Every job in this pipeline
+still only proves compile/package/protocol-interop correctness, never
+real-device VPN behavior — see `docs/CI.md` "What CI explicitly does NOT
+prove" and `docs/DEVICE_ACCEPTANCE.md`, which remain the accurate,
+current caveats.
 
 ## Before public promotion: manually recorded device acceptance
 
@@ -255,14 +258,15 @@ Collected from throughout this document, so nothing is missed:
 
 1. Generate and configure all secrets listed above, in both
    `android-release` and `ios-release` Environments.
-2. Register the PacketTunnel/NetworkExtension Xcode target
-   (`docs/BUILDING.md` "iOS") — until this lands, `ios-release-build`
-   signs and archives the main app only; the "Known gap" note above
-   applies.
-3. Resolve `lib/app/utils/` and `VPNService`/`ProxyConfig`/`ServerConfig`
-   (`docs/ARCHITECTURE.md` §9) — until this lands, `android-debug-smoke`/
-   `ios-debug-smoke` (and therefore the whole pipeline) stay red, by
-   design (see "Release gates" above).
+2. ~~Register the PacketTunnel/NetworkExtension Xcode target~~ **Done** —
+   `ios-build.yml`'s `xcodebuild` step compiles both the `Runner` and
+   `PacketTunnel` targets against the real `Libbox.xcframework` (see
+   `docs/CI.md`). Compiling is not the same as a validated, working
+   NetworkExtension on a real device — that is still an open, device-only
+   gap (`docs/DEVICE_ACCEPTANCE.md`).
+3. ~~Resolve `lib/app/utils/` and `VPNService`/`ProxyConfig`/`ServerConfig`~~
+   **Done** (`docs/ARCHITECTURE.md` §9) — `android-debug-smoke`/
+   `ios-debug-smoke` build the real app, not a stub.
 4. Complete the store compliance placeholders in `docs/release/APPLE.md`
    and `docs/release/GOOGLE_PLAY.md` — every checkbox there needs a real
    answer reflecting this app's actual behavior, not a template default.

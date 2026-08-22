@@ -267,7 +267,21 @@ pull_request / push(main)
               vulnerability-scan       (ubuntu, ~2-4 min)    ─┘
 ```
 
-Five workflow files, twelve jobs total. All five trigger on the same
+**UPDATE, added after this document's original workflow-graph diagram was
+written**: a sixth workflow file, `release.yml`, now exists — it does not
+appear in the graph above because it is tag-triggered (`push: tags:
+["v*"]`), not `pull_request`/`push: branches: [main]` like the five PR/CI
+workflows the graph diagrams. It reuses every job above as a
+`workflow_call` gate, then adds real signed Android (AAB+APK) and iOS
+(IPA) release builds and internal-track store uploads (Play Internal
+Testing, TestFlight Internal Testing) behind two GitHub Environments'
+secrets. See `docs/release/RELEASE_CHECKLIST.md` for the full walkthrough
+— it is a CD pipeline, not a merge gate, and it still never promotes past
+internal/beta distribution automatically.
+
+Five PR/push-triggered workflow files, twelve jobs total (plus
+`release.yml`'s own release-only jobs, gated behind a version tag and
+real signing secrets). All five PR/push workflows trigger on the same
 events (`pull_request` targeting `main`, `push` to `main`,
 `workflow_dispatch`) so they run in parallel as separate GitHub Actions
 checks rather than one long sequential pipeline — a UI-only PR waits on
@@ -578,15 +592,27 @@ design):
 - Require at least one review approval.
 - Do not allow force-pushes or deletion of `main`.
 
-## Secrets required: NONE
+## Secrets required: NONE for the five PR/CI workflows above; real secrets for `release.yml`
 
-Every workflow in this pass runs with only the default, automatically
-provided `GITHUB_TOKEN` (read-only `contents: read` permission,
-explicitly declared in each workflow) or no token at all. Nothing here
-signs a store-distributable artifact, uploads to TestFlight/Play Console,
-or authenticates to any external service. This is intentional and matches
-this task's explicit scope ("Do not add deployment/store secrets yet") —
-a future release-workflow task will need to introduce real signing
-material via GitHub Actions encrypted secrets (or, better, an OIDC-based
-cloud KMS/Fastlane match-style flow), and that is genuinely out of scope
-here, not an oversight.
+Every workflow diagrammed in the graph above (the five PR/push,
+merge-gate workflows) runs with only the default, automatically provided
+`GITHUB_TOKEN` (read-only `contents: read` permission, explicitly
+declared in each workflow) or no token at all. This remains true and is
+what makes every PR's CI result trustworthy without any repository owner
+having configured anything.
+
+UPDATE: `release.yml` (see "Workflow graph" above) is a separate,
+tag-triggered pipeline that genuinely does need real secrets —
+`ANDROID_KEYSTORE_BASE64` and friends, `IOS_DIST_CERTIFICATE_P12_BASE64`
+and friends, a Google Play service account JSON, and an App Store Connect
+API key — scoped to two GitHub Environments (`android-release`,
+`ios-release`). See `docs/release/RELEASE_CHECKLIST.md` "Secrets to
+configure" for the full list and how to produce each one. This document's
+original "Secrets required: NONE" claim was accurate for the CI-only
+scope it was written for, but is no longer accurate for the repository as
+a whole now that `release.yml` exists — whether those secrets are
+actually configured in this specific repository's Environments cannot be
+verified by reading the repository's own files (a configured
+GitHub-encrypted secret is never visible from a checkout); tagging a
+release without them configured fails loudly (each secret-consuming step
+has an explicit `::error::` check), not silently.

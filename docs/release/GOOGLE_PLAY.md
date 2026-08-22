@@ -11,7 +11,7 @@ everything requiring a business/legal decision is `[ ]` with a
 - [ ] Enroll a [Google Play Console](https://play.google.com/console) **Organization** account (not a personal/individual one) — a $25 one-time registration fee, but organization accounts get faster access to restricted-permission declarations and are what most Play policy guidance assumes for an app requesting `ACCESS_BACKGROUND_LOCATION` (see below).
       `TODO(you):` record the enrolled organization name and account owner here.
 - [ ] Create a service account for CI uploads (**Play Console → Setup → API access → Create new service account**, following the linked Google Cloud Console flow), grant it at minimum "Release manager" access to this specific app, download its JSON key, and store it as the `GOOGLE_PLAY_SERVICE_ACCOUNT_JSON` secret — see `docs/release/RELEASE_CHECKLIST.md` "Secrets to configure".
-- [ ] Confirm the package name matches `ANDROID_PACKAGE_NAME` in `.github/workflows/release.yml` (`com.nebula.karing` as of this audit — update both places together if/when this fork rebrands, `docs/FORK_ARCHITECTURE_AUDIT.md` §10).
+- [ ] Confirm the package name matches `ANDROID_PACKAGE_NAME` in `.github/workflows/release.yml` (`com.david610.singboxclient` as of the current `origin/main` — this is the rebranded identity, see `docs/CLIENT_PRODUCTION_BASELINE.md` "Product identity"; this doc's earlier text citing `com.nebula.karing` was stale). **Unresolved provenance note**: `com.david610.*` reads as a prior contributor's GitHub handle, not a domain/identifier independently confirmed to belong to this project's current owner — confirm you actually control this identifier in your own Play Console developer account (package names are permanent once published) before using it for a real release, or change it now while it's still free to change.
 
 ### Service account setup (detail)
 
@@ -28,6 +28,31 @@ everything requiring a business/legal decision is `[ ]` with a
    the service account → Keys → Add Key → JSON), download it, and
    immediately store its content as the `GOOGLE_PLAY_SERVICE_ACCOUNT_JSON`
    GitHub secret — then delete the local copy.
+
+## Target API level, AAB, and 16 KB page size
+
+Verified directly against `android/app/build.gradle.kts` and
+`.github/workflows/android-build.yml`/`release.yml`:
+
+- [x] `compileSdkVersion = "android-35"`, `targetSdk = 35`. This sandbox
+  has no live internet access to confirm today's exact current Play
+  Console minimum target-API-level requirement (Play typically requires
+  targeting within one year of the latest major Android release) —
+  `TODO(you):` check the current requirement in Play Console at
+  submission time; API 35 was current at the time this repository's own
+  CI pins were last reasoned about (`docs/CI.md`), but that can go stale.
+- [x] **16 KB page-size compliance is actually checked, not assumed** —
+  `android-build.yml` runs `llvm-readelf` against every 64-bit `.so` in
+  both `libbox.aar` and the final release APK and fails the build if any
+  `LOAD` segment is aligned below 16384 bytes (Play's requirement, in
+  effect since Nov 2025, for apps targeting API 35+). This is a real,
+  executed inspection of the actual built bytes, not a version-number
+  check.
+- [x] `release.yml`'s `android-release-build` job runs `flutter build
+  appbundle --release`, producing a real signed `.aab` (Play requires AAB
+  for new app submissions) — an `.apk` is also built (`flutter build apk
+  --release`) for GitHub-release/sideload distribution, not as the Play
+  submission artifact.
 
 ## `VpnService` declaration
 
@@ -51,19 +76,20 @@ verified directly from `android/app/src/main/AndroidManifest.xml`:
 
 | Permission | Why it needs disclosure |
 |---|---|
-| `ACCESS_BACKGROUND_LOCATION` | Google's most heavily scrutinized permission category — requires a separate Play Console "Background location" declaration form, a demonstrated in-app feature that needs it, AND prominent disclosure shown at the point of request |
-| `ACCESS_FINE_LOCATION` / `ACCESS_COARSE_LOCATION` | Same disclosure expectation, lighter review than background location alone |
-| `CAMERA` | Used for the QR-code scanning UI in Karing's existing codebase (`zxing2`/`qr_code_scanner_plus` in `pubspec.yaml`) — `TODO(you):` confirm this is the only camera use once that UI is reachable again (`docs/ARCHITECTURE.md` §9) |
-| `QUERY_ALL_PACKAGES` | Requires its own Play Console declaration form (Policy → App content → "All apps that use this permission") with a justified use case — per-app VPN routing/exclusion (letting the user pick which installed apps go through the tunnel) is the plausible legitimate use here, but `TODO(you):` confirm against the actual reconstructed per-app-routing feature once it exists |
+| `ACCESS_FINE_LOCATION` / `ACCESS_COARSE_LOCATION` | Requires Play Console disclosure and a demonstrated in-app feature. UPDATE (verified against the current `origin/main` manifest, superseding this table's earlier text): `ACCESS_BACKGROUND_LOCATION` is **no longer requested** — removed as vestigial per `docs/CLIENT_PRODUCTION_BASELINE.md` "Permissions (Android)" (verified absent by reading `android/app/src/main/AndroidManifest.xml` directly). Only the foreground fine/coarse location permissions remain, for Wi-Fi SSID/BSSID-based routing rules; `docs/CLIENT_PRODUCTION_BASELINE.md` itself notes no runtime permission-request flow was found for this feature, so it may not function end to end today — confirm before answering the Play questionnaire. |
+| `CAMERA` | Used for the QR-code scanning UI (`zxing2`/`qr_code_scanner_plus` in `pubspec.yaml`) — `TODO(you):` confirm this is the only camera use |
+| `QUERY_ALL_PACKAGES` | Requires its own Play Console declaration form (Policy → App content → "All apps that use this permission") with a justified use case — per-app VPN routing/exclusion (letting the user pick which installed apps go through the tunnel) is the plausible legitimate use here. This is a **KNOWN BLOCKER per `docs/CLIENT_PRODUCTION_BASELINE.md`**: the permission is real and kept (traced to genuine per-app-routing code, not vestigial), but the Play Console policy justification/declaration for it has not been completed. |
 
-- [ ] `TODO(you):` implement the actual disclosure UI — same status as
-  the iOS "pre-use VPN data disclosure" screen in `docs/release/APPLE.md`:
-  not yet built, because the screens that would host it are part of the
-  still-unreconstructed UI layer (`docs/ARCHITECTURE.md` §9).
-- [ ] Complete the corresponding Play Console declaration forms for
-  background location and `QUERY_ALL_PACKAGES` (Policy → App content) —
-  each requires a specific written justification tied to an actual,
-  reviewable in-app feature.
+- [ ] `TODO(you):` implement the actual pre-use disclosure UI — the VPN
+  start flow itself (`VPNService`/`ProxyConfig`) is real and reconstructed
+  as of current `origin/main` (`docs/ARCHITECTURE.md` §9), so a real flow
+  exists to attach this screen to; the disclosure screen itself still
+  needs to be designed and built, matching the iOS "pre-use VPN data
+  disclosure" item in `docs/release/APPLE.md`.
+- [ ] Complete the corresponding Play Console declaration form for
+  `QUERY_ALL_PACKAGES` (Policy → App content) — requires a specific
+  written justification tied to the actual per-app-routing feature. (No
+  background-location form is needed now that permission is removed.)
 
 ## Data Safety form
 
@@ -82,9 +108,10 @@ Worksheet, not answers:
 
 Google requires a short (typically ~30–90 second) demo video in Play
 Console's app content submission for apps requesting sensitive
-permissions this app requests (background location, `QUERY_ALL_PACKAGES`)
-— confirm the current exact requirement in Play Console at submission
-time, since Google's specific thresholds change.
+permissions this app requests (`QUERY_ALL_PACKAGES`; location permissions
+if the per-app-routing/SSID-rule feature is demonstrated) — confirm the
+current exact requirement in Play Console at submission time, since
+Google's specific thresholds change.
 
 - [ ] `TODO(you):` record a real screen capture showing: granting the VPN
   permission, connecting, the app's actual state while connected, and
