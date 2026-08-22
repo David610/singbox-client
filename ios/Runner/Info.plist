@@ -9,7 +9,7 @@
 	<key>CFBundleDisplayName</key>
 	<string>${MY_BUNDLE_DISPLAY_NAME}</string>
 	<key>CFBundleExecutable</key>
-	<string>${MY_BUNDLE_DISPLAY_NAME}</string>
+	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
 	<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
 	<key>CFBundleInfoDictionaryVersion</key>
@@ -135,12 +135,12 @@
 		<string>zh-TW</string>
 	</array>
 	<key>NSLocationAlwaysUsageDescription</key>
-	<string>Karing uses the Location permission to provide users with routing based on WIFI SSID and BSSID rules, without reading your location.</string>
+	<string>SingBox Client uses the Location permission to provide users with routing based on WIFI SSID and BSSID rules, without reading your location.</string>
 	<key>NSLocationUsageDescription</key>
-	<string>Karing uses the Location permission to provide users with routing based on WIFI SSID and BSSID rules, without reading your location.</string>
+	<string>SingBox Client uses the Location permission to provide users with routing based on WIFI SSID and BSSID rules, without reading your location.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>Karing uses the Location permission to provide users with routing based on WIFI SSID and BSSID rules, without reading your location.</string>
+	<string>SingBox Client uses the Location permission to provide users with routing based on WIFI SSID and BSSID rules, without reading your location.</string>
 	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
-	<string>Karing uses the Location permission to provide users with routing based on WIFI SSID and BSSID rules, without reading your location.</string>
+	<string>SingBox Client uses the Location permission to provide users with routing based on WIFI SSID and BSSID rules, without reading your location.</string>
 </dict>
 </plist>
