@@ -244,6 +244,14 @@ class ProxyConfig {
   String attach = "";
   Map<String, dynamic>? raw;
 
+  /// Stable id used to look up this server's credential-bearing `raw`
+  /// outbound in `CredentialStore` (Android Keystore / iOS Keychain)
+  /// instead of persisting `raw` inline. Empty means "not yet migrated to
+  /// secure storage" -- see `ServerManager._buildSecureServerConfigJson`.
+  /// This field is plain metadata (not itself secret) and is safe to keep
+  /// in ordinary JSON and to carry through `clone()`.
+  String secretRef = "";
+
   Map<String, dynamic> toJson() => {
     'groupid': groupid,
     'tag': tag,
@@ -255,6 +263,7 @@ class ProxyConfig {
     'outlet_region': outletregion,
     'attach': attach,
     if (raw != null) 'raw': raw,
+    if (secretRef.isNotEmpty) 'secret_ref': secretRef,
   };
 
   void fromJson(Map<String, dynamic>? map) {
@@ -269,6 +278,7 @@ class ProxyConfig {
     outletregion = map["outlet_region"] ?? "";
     attach = map["attach"] ?? "";
     raw = map["raw"] is Map ? Map<String, dynamic>.from(map["raw"]) : null;
+    secretRef = map["secret_ref"] ?? "";
   }
 
   ProxyConfig clone() {
@@ -310,6 +320,14 @@ class ServerConfigGroupItem {
   List<ProxyUrltest> urltests = [];
 
   String urlOrPath = "";
+
+  /// Stable id used to look up this group's remote subscription URL (which
+  /// may embed an access token) in `CredentialStore` instead of persisting
+  /// it inline as `url_or_path`. Only used when `isRemote()` -- a local
+  /// file-import path is not a secret and stays in plain JSON. Empty means
+  /// "not yet migrated" or "not a remote URL". Plain metadata, safe in
+  /// ordinary JSON and through `clone()`.
+  String urlSecretRef = "";
   String site = "";
   bool userAgentAppend = false;
   List<String> userAgentCompatibles = [];
@@ -340,6 +358,7 @@ class ServerConfigGroupItem {
     'servers': servers.map((s) => s.toJson()).toList(),
     'urltests': urltests.map((u) => u.toJson()).toList(),
     'url_or_path': urlOrPath,
+    if (urlSecretRef.isNotEmpty) 'url_secret_ref': urlSecretRef,
     'site': site,
     'useragent_append': userAgentAppend,
     'useragent_compatibles': userAgentCompatibles,
@@ -377,6 +396,7 @@ class ServerConfigGroupItem {
       urltests.add(ul);
     }
     urlOrPath = map["url_or_path"] ?? "";
+    urlSecretRef = map["url_secret_ref"] ?? "";
     site = map["site"] ?? "";
     userAgentAppend = map["useragent_append"] ?? false;
     userAgentCompatibles = List<String>.from(
