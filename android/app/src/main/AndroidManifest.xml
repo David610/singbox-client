@@ -27,6 +27,18 @@
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
     <uses-permission android:name="android.permission.OBSERVE_GRANT_REVOKE_PERMISSIONS" />
     <uses-permission android:name="android.permission.RECEIVE_USER_PRESENT" />
+    <!-- Gates AutomationCommandReceiver (below): any app on the device can
+         send an implicit broadcast to an exported receiver with no
+         android:permission, so without this a malicious app could silently
+         kill (or, once CONNECT is wired up, meddle with) the user's VPN
+         tunnel, a real deanonymization/leak vector for a VPN app. Normal
+         protection level (not signature) so genuine automation apps
+         (Tasker etc.) can still declare and use it; it is no longer wide
+         open to every installed app. -->
+    <permission
+        android:name="com.nebula.karing.permission.CONTROL_VPN"
+        android:protectionLevel="normal" />
+    <uses-permission android:name="com.nebula.karing.permission.CONTROL_VPN" />
     <!--TV-->
     <uses-feature android:name="android.software.leanback" android:required="false"/>
     <uses-feature android:name="android.hardware.touchscreen" android:required="false"/>
@@ -110,7 +122,8 @@
         </service>
         <receiver
             android:name=".AutomationCommandReceiver"
-            android:exported="true">
+            android:exported="true"
+            android:permission="com.nebula.karing.permission.CONTROL_VPN">
             <intent-filter>
                 <action android:name="com.nebula.karing.action.CONNECT" />
                 <action android:name="com.nebula.karing.action.DISCONNECT" />

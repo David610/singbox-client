@@ -58,6 +58,19 @@ public class VpnCorePlugin: NSObject, FlutterPlugin {
         case "restart":
             // NETunnelProviderManager has no atomic "replace config" call;
             // stop, then start with the new provider configuration.
+            //
+            // stopVPNTunnel() has no completion handler -- calling
+            // startVPNTunnel() again immediately (the old behavior here)
+            // raced the extension's own teardown: NEPacketTunnelProvider's
+            // stopTunnel()->startTunnel() on the same extension instance is
+            // not guaranteed atomic, so a fast restart could hit
+            // NEVPNErrorConfigurationDisabled or start against a tunnel
+            // that hasn't actually torn down yet. Wait for a real
+            // .disconnected status (or a bounded timeout, so a stuck
+            // extension can't hang the user's reconnect forever) before
+            // starting again -- the same "don't start until the previous
+            // instance is confirmed gone" guarantee SingBoxVpnService
+            // already gives on Android.
             guard let args = call.arguments as? [String: Any],
                   let tag = args["tag"] as? String,
                   let configJson = args["configJson"] as? String
@@ -65,10 +78,20 @@ public class VpnCorePlugin: NSObject, FlutterPlugin {
                 return result(FlutterError(code: "bad_args", message: "tag and configJson are required", details: nil))
             }
             loadOrCreateManager { managerResult in
-                if case .success(let manager) = managerResult {
-                    manager.connection.stopVPNTunnel()
+                switch managerResult {
+                case .failure(let error):
+                    return result(FlutterError(code: "restart_failed", message: error.localizedDescription, details: nil))
+                case .success(let manager):
+                    let connection = manager.connection
+                    if connection.status == .disconnected || connection.status == .invalid {
+                        self.start(tag: tag, configJson: configJson, result: result)
+                        return
+                    }
+                    self.waitForDisconnect(of: connection) {
+                        self.start(tag: tag, configJson: configJson, result: result)
+                    }
+                    connection.stopVPNTunnel()
                 }
-                self.start(tag: tag, configJson: configJson, result: result)
             }
 
         case "status":
@@ -124,6 +147,35 @@ public class VpnCorePlugin: NSObject, FlutterPlugin {
                 }
             }
         }
+    }
+
+    /// Resolves once `connection.status` actually reaches `.disconnected`,
+    /// or after `timeout` seconds if it never does (a stuck extension must
+    /// not hang the caller forever -- the subsequent `startVPNTunnel` is
+    /// still safe to attempt either way, since NetworkExtension itself
+    /// will surface a real error if the previous instance genuinely never
+    /// tore down).
+    private func waitForDisconnect(
+        of connection: NEVPNConnection, timeout: TimeInterval = 5, completion: @escaping () -> Void
+    ) {
+        var observer: NSObjectProtocol?
+        var didComplete = false
+        let finish = {
+            if didComplete { return }
+            didComplete = true
+            if let observer = observer {
+                NotificationCenter.default.removeObserver(observer)
+            }
+            completion()
+        }
+        observer = NotificationCenter.default.addObserver(
+            forName: .NEVPNStatusDidChange, object: connection, queue: .main
+        ) { _ in
+            if connection.status == .disconnected {
+                finish()
+            }
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + timeout, execute: finish)
     }
 
     private func loadOrCreateManager(_ completion: @escaping (Result<NETunnelProviderManager, Error>) -> Void) {
