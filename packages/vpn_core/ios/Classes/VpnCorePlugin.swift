@@ -13,6 +13,27 @@ public class VpnCorePlugin: NSObject, FlutterPlugin {
     private var statusObserver: NSObjectProtocol?
     private var eventSink: FlutterEventSink?
 
+    // Guards start/stop/restart against running concurrently. All of
+    // handle(_:result:) runs on the main thread (Flutter's method channel
+    // dispatch), and this flag is only ever read/written there, so a plain
+    // Bool is sufficient -- no lock needed. Without this, a `restart` and a
+    // `start` (or two overlapping `restart`s -- e.g. the user double-tapping
+    // reconnect) could each independently call stopVPNTunnel()/
+    // startVPNTunnel() on the same NEVPNConnection while the other is still
+    // mid-flight, which is exactly the kind of lifecycle race this file
+    // exists to prevent for the single-call case.
+    private var operationInFlight = false
+
+    private func beginOperation() -> Bool {
+        if operationInFlight { return false }
+        operationInFlight = true
+        return true
+    }
+
+    private func endOperation() {
+        operationInFlight = false
+    }
+
     public static func register(with registrar: FlutterPluginRegistrar) {
         let instance = VpnCorePlugin()
         let methodChannel = FlutterMethodChannel(
@@ -42,10 +63,21 @@ public class VpnCorePlugin: NSObject, FlutterPlugin {
             else {
                 return result(FlutterError(code: "bad_args", message: "tag and configJson are required", details: nil))
             }
+            guard beginOperation() else {
+                return result(FlutterError(
+                    code: "operation_in_progress",
+                    message: "Another start/stop/restart is already in progress", details: nil))
+            }
             start(tag: tag, configJson: configJson, result: result)
 
         case "stop":
+            guard beginOperation() else {
+                return result(FlutterError(
+                    code: "operation_in_progress",
+                    message: "Another start/stop/restart is already in progress", details: nil))
+            }
             loadOrCreateManager { managerResult in
+                defer { self.endOperation() }
                 switch managerResult {
                 case .success(let manager):
                     manager.connection.stopVPNTunnel()
@@ -66,28 +98,49 @@ public class VpnCorePlugin: NSObject, FlutterPlugin {
             // not guaranteed atomic, so a fast restart could hit
             // NEVPNErrorConfigurationDisabled or start against a tunnel
             // that hasn't actually torn down yet. Wait for a real
-            // .disconnected status (or a bounded timeout, so a stuck
-            // extension can't hang the user's reconnect forever) before
-            // starting again -- the same "don't start until the previous
-            // instance is confirmed gone" guarantee SingBoxVpnService
-            // already gives on Android.
+            // .disconnected (or .invalid) status before starting again --
+            // the same "don't start until the previous instance is
+            // confirmed gone" guarantee SingBoxVpnService already gives on
+            // Android. If that never happens within a bounded timeout, fail
+            // deterministically instead of guessing that NetworkExtension
+            // will reject a racing startVPNTunnel() correctly -- a silent
+            // lifecycle race here is a real connectivity/privacy bug, not
+            // just a UX papercut, so "try anyway and hope" is not
+            // acceptable for a VPN state machine.
             guard let args = call.arguments as? [String: Any],
                   let tag = args["tag"] as? String,
                   let configJson = args["configJson"] as? String
             else {
                 return result(FlutterError(code: "bad_args", message: "tag and configJson are required", details: nil))
             }
+            guard beginOperation() else {
+                return result(FlutterError(
+                    code: "operation_in_progress",
+                    message: "Another start/stop/restart is already in progress", details: nil))
+            }
             loadOrCreateManager { managerResult in
                 switch managerResult {
                 case .failure(let error):
+                    self.endOperation()
                     return result(FlutterError(code: "restart_failed", message: error.localizedDescription, details: nil))
                 case .success(let manager):
                     let connection = manager.connection
                     if connection.status == .disconnected || connection.status == .invalid {
+                        // start() ends the operation itself once it resolves.
                         self.start(tag: tag, configJson: configJson, result: result)
                         return
                     }
-                    self.waitForDisconnect(of: connection) {
+                    self.waitForDisconnect(of: connection) { disconnected in
+                        guard disconnected else {
+                            self.endOperation()
+                            return result(FlutterError(
+                                code: "restart_timeout",
+                                message: "Timed out waiting for the previous VPN tunnel instance to "
+                                    + "disconnect before restarting; not starting a new one against a "
+                                    + "tunnel whose teardown state is unknown.",
+                                details: nil))
+                        }
+                        // start() ends the operation itself once it resolves.
                         self.start(tag: tag, configJson: configJson, result: result)
                     }
                     connection.stopVPNTunnel()
@@ -124,14 +177,17 @@ public class VpnCorePlugin: NSObject, FlutterPlugin {
         loadOrCreateManager { managerResult in
             switch managerResult {
             case .failure(let error):
+                self.endOperation()
                 return result(FlutterError(code: "start_failed", message: error.localizedDescription, details: nil))
             case .success(let manager):
                 manager.localizedDescription = tag
                 manager.isEnabled = true
                 manager.saveToPreferences { saveError in
                     if let saveError = saveError {
+                        self.endOperation()
                         return result(FlutterError(code: "save_failed", message: saveError.localizedDescription, details: nil))
                     }
+                    defer { self.endOperation() }
                     do {
                         // configJson never crosses as a launch argument or
                         // gets logged: NETunnelProviderManager's
@@ -149,33 +205,44 @@ public class VpnCorePlugin: NSObject, FlutterPlugin {
         }
     }
 
-    /// Resolves once `connection.status` actually reaches `.disconnected`,
-    /// or after `timeout` seconds if it never does (a stuck extension must
-    /// not hang the caller forever -- the subsequent `startVPNTunnel` is
-    /// still safe to attempt either way, since NetworkExtension itself
-    /// will surface a real error if the previous instance genuinely never
-    /// tore down).
+    /// Calls `completion(true)` once `connection.status` actually reaches
+    /// `.disconnected` or `.invalid` (both mean "no active tunnel instance
+    /// left to race against"), or `completion(false)` after `timeout`
+    /// seconds if it never does -- the caller must treat `false` as a
+    /// deterministic failure, not a green light to start anyway; see the
+    /// "restart" case's comment for why. The completion is guaranteed to
+    /// run exactly once and the observer is always removed, whichever path
+    /// fires first (`didComplete` short-circuits the loser).
+    ///
+    /// Registers its notification observer BEFORE the caller issues
+    /// `stopVPNTunnel()` (see call sites), so a status change that happens
+    /// immediately after `stopVPNTunnel()` is called can never be missed.
     private func waitForDisconnect(
-        of connection: NEVPNConnection, timeout: TimeInterval = 5, completion: @escaping () -> Void
+        of connection: NEVPNConnection, timeout: TimeInterval = 5, completion: @escaping (Bool) -> Void
     ) {
         var observer: NSObjectProtocol?
         var didComplete = false
-        let finish = {
+        let finish = { (disconnected: Bool) in
             if didComplete { return }
             didComplete = true
             if let observer = observer {
                 NotificationCenter.default.removeObserver(observer)
             }
-            completion()
+            completion(disconnected)
         }
         observer = NotificationCenter.default.addObserver(
             forName: .NEVPNStatusDidChange, object: connection, queue: .main
         ) { _ in
-            if connection.status == .disconnected {
-                finish()
+            switch connection.status {
+            case .disconnected, .invalid:
+                finish(true)
+            default:
+                break
             }
         }
-        DispatchQueue.main.asyncAfter(deadline: .now() + timeout, execute: finish)
+        DispatchQueue.main.asyncAfter(deadline: .now() + timeout) {
+            finish(false)
+        }
     }
 
     private func loadOrCreateManager(_ completion: @escaping (Result<NETunnelProviderManager, Error>) -> Void) {
