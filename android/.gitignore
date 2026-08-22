@@ -1,7 +1,7 @@
 /.gradle
 /captures/
-/gradlew
-/gradlew.bat
+# The Gradle launchers are source-controlled build inputs.  Ignoring them
+# leaves clean checkouts unable to run any Android build, including CI.
 /local.properties
 
 **/*.keystore

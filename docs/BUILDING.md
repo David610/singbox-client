@@ -38,6 +38,11 @@ architecture — see "Known remaining build blockers" below.
 | iOS deployment target | 13.0 (`packages/vpn_core/ios/vpn_core.podspec`; verify against `ios/Runner.xcodeproj` for the app target's own setting) |
 | Go (for the VPN core only) | `1.24.7`+ (`packages/vpn_core/native/singbox-go/go.mod`) |
 
+The Gradle wrapper launchers (`android/gradlew` and `android/gradlew.bat`)
+are committed alongside the wrapper JAR and properties. A clean checkout must
+not rely on a globally-installed Gradle or on Flutter regenerating these files;
+the Android build invokes the checked-in wrapper directly.
+
 None of these were changed by this milestone; they were read from the
 existing repo, not upgraded.
 
