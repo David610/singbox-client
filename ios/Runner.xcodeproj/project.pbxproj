@@ -23,6 +23,7 @@
 		AA2000000000000000000003 /* RunBlocking.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA1000000000000000000003 /* RunBlocking.swift */; };
 		AA2000000000000000000004 /* Libbox.xcframework in Frameworks */ = {isa = PBXBuildFile; fileRef = AA1000000000000000000006 /* Libbox.xcframework */; };
 		AA4000000000000000000001 /* UIKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = AA4000000000000000000002 /* UIKit.framework */; };
+		AA4000000000000000000004 /* UIKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = AA4000000000000000000002 /* UIKit.framework */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -117,6 +118,7 @@
 			files = (
 				CED44C8B29F7AE560051B3B6 /* NetworkExtension.framework in Frameworks */,
 				AA2000000000000000000004 /* Libbox.xcframework in Frameworks */,
+				AA4000000000000000000004 /* UIKit.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

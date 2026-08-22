@@ -145,11 +145,7 @@ jobs:
         # Proves the Dart/Flutter side and the Runner app target's own
         # compilation -- does NOT touch the embedded extension target;
         # see this file's header.
-        #
-        # TEMPORARY: --verbose while diagnosing the UIKit undefined-symbol
-        # link failure -- reveals the actual xcodebuild/clang invocation
-        # instead of flutter's collapsed progress line. Remove once fixed.
-        run: flutter build ios --release --no-codesign --verbose
+        run: flutter build ios --release --no-codesign
 
       - name: xcodebuild Runner scheme (forces the embedded VPN extension to compile against the real Libbox.xcframework)
         working-directory: ios
