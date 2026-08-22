@@ -22,6 +22,7 @@
 		AA2000000000000000000002 /* PlatformInterface.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA1000000000000000000002 /* PlatformInterface.swift */; };
 		AA2000000000000000000003 /* RunBlocking.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA1000000000000000000003 /* RunBlocking.swift */; };
 		AA2000000000000000000004 /* Libbox.xcframework in Frameworks */ = {isa = PBXBuildFile; fileRef = AA1000000000000000000006 /* Libbox.xcframework */; };
+		AA4000000000000000000001 /* UIKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = AA4000000000000000000002 /* UIKit.framework */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -88,6 +89,7 @@
 		CE4B133229ED20B8006E81E6 /* Runner.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Runner.entitlements; sourceTree = "<group>"; };
 		CED44C8A29F7AE560051B3B6 /* PacketTunnel.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = PacketTunnel.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		CEE7505E29EE95B8003FAECA /* NetworkExtension.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = NetworkExtension.framework; path = System/Library/Frameworks/NetworkExtension.framework; sourceTree = SDKROOT; };
+		AA4000000000000000000002 /* UIKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = UIKit.framework; path = System/Library/Frameworks/UIKit.framework; sourceTree = SDKROOT; };
 		FE6A74A85E74F14B2A4D639E /* Pods-Runner.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-Runner.release.xcconfig"; path = "Target Support Files/Pods-Runner/Pods-Runner.release.xcconfig"; sourceTree = "<group>"; };
 		78E0A7A72DC9AD7400C4905E /* FlutterGeneratedPluginSwiftPackage */ = {isa = PBXFileReference; lastKnownFileType = wrapper; name = FlutterGeneratedPluginSwiftPackage; path = Flutter/ephemeral/Packages/FlutterGeneratedPluginSwiftPackage; sourceTree = "<group>"; };
 		AA1000000000000000000001 /* PacketTunnelProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PacketTunnelProvider.swift; sourceTree = "<group>"; };
@@ -105,6 +107,7 @@
 			files = (
 				78A318202AECB46A00862997 /* FlutterGeneratedPluginSwiftPackage in Frameworks */,
 				A09092BFE381CEB1C2F0E45C /* Pods_Runner.framework in Frameworks */,
+				AA4000000000000000000001 /* UIKit.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -126,6 +129,7 @@
 				AA1000000000000000000006 /* Libbox.xcframework */,
 				AFCB9FCD5D76BA2D6004A1A4 /* Pods_Runner.framework */,
 				CEE7505E29EE95B8003FAECA /* NetworkExtension.framework */,
+				AA4000000000000000000002 /* UIKit.framework */,
 			);
 			name = Frameworks;
 			sourceTree = "<group>";
