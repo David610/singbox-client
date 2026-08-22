@@ -45,8 +45,6 @@ import 'package:karing/screens/home_tvos_screen.dart';
 import 'package:karing/screens/list_add_screen.dart';
 import 'package:karing/screens/map_string_and_list_add_screen.dart';
 import 'package:karing/screens/net_interfaces_screen.dart';
-import 'package:karing/screens/perapp_android_screen.dart';
-import 'package:karing/screens/perapp_macos_screen.dart';
 import 'package:karing/screens/qrcode_scan_screen.dart';
 import 'package:karing/screens/qrcode_screen.dart';
 import 'package:karing/screens/region_settings_screen.dart';
@@ -623,34 +621,6 @@ class GroupHelper {
                   : (bool value) async {
                       settingConfig.tun.allowBypass = value;
                       SettingManager.setDirty(true);
-                    },
-            ),
-          ),
-        ],
-        if (Platform.isAndroid /*|| Platform.isMacOS*/ ) ...[
-          GroupItemOptions(
-            pushOptions: GroupItemPushOptions(
-              name: tcontext.PerAppAndroidScreen.title,
-              onPush: !tunMode
-                  ? null
-                  : () async {
-                      if (Platform.isAndroid) {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            settings: PerAppAndroidScreen.routSettings(),
-                            builder: (context) => const PerAppAndroidScreen(),
-                          ),
-                        );
-                      } else if (Platform.isMacOS) {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            settings: PerAppMacosScreen.routSettings(),
-                            builder: (context) => const PerAppMacosScreen(),
-                          ),
-                        );
-                      }
                     },
             ),
           ),
@@ -2719,6 +2689,11 @@ class GroupHelper {
     Uri? downloadUri = Uri.tryParse(url);
     if (downloadUri == null) {
       return ReturnResultError("invalid URL: $url");
+    }
+    if (downloadUri.scheme.toLowerCase() != 'https') {
+      return ReturnResultError(
+        "only https:// backup restore URLs are supported",
+      );
     }
     if (!context.mounted) {
       return null;

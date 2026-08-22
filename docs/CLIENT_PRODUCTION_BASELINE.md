@@ -56,23 +56,58 @@ screen), `ACCESS_FINE_LOCATION`/`ACCESS_COARSE_LOCATION` (Wi-Fi
 SSID/BSSID reading for the diversion-rule editor — Android requires
 location permission for this API; note no runtime permission request flow
 was found, so this may already be non-functional on modern Android without
-a manual grant — NOT VERIFIED whether the feature actually works
-end-to-end today), `QUERY_ALL_PACKAGES` (per-app routing screen).
+a manual grant — STILL NOT VERIFIED whether the underlying feature
+actually reaches the shipped sing-box config end-to-end: the diversion
+group model round-trips `wifi_ssid`/`wifi_bssid` through local settings
+storage (`lib/app/modules/vpn_service_state.dart`), but no reference to
+those fields was found in the Dart config-building path
+(`lib/app/utils/singbox_config_builder.dart`,
+`lib/app/utils/singbox_outbound.dart`) either. Resolving that would mean
+inspecting/changing how the real shipping VPN config gets built, which is
+out of scope for a mobile-identity/dead-surface pass per this task's own
+constraints — left as a DEFERRED open question, not touched), and
+`QUERY_ALL_PACKAGES`.
 
-KNOWN BLOCKER, not resolved: `QUERY_ALL_PACKAGES` requires an explicit
-Play Console policy justification/declaration before Play Store
-submission. Whether per-app routing ships as a product feature at all is a
-product decision this pass did not make — removing the permission blind
-would have silently broken a real, working UI screen.
+UPDATE (mobile identity pass): the per-app-routing screen that originally
+motivated `QUERY_ALL_PACKAGES` (`lib/screens/perapp_android_screen.dart`,
+"Per-App Proxy") has been deleted — it was confirmed dead, not merely
+undecided: `packages/vpn_core`'s native `SingBoxVpnService.kt` does define
+`includePackage`/`excludePackage` VPN-builder options, but the Dart-facing
+`vpn_core` plugin API never exposed a way to set them, and no Dart code
+anywhere read `SettingManager.getConfig().perapp.list` to populate them —
+so toggling apps in that screen persisted a setting that could never
+affect the actual tunnel. `QUERY_ALL_PACKAGES` itself is KEPT anyway:
+`lib/app/utils/package_manager_android.dart`'s full package enumeration is
+shared infrastructure still used by two real, wired features — the
+diversion-rule per-app target picker (`group.package`, a genuine sing-box
+`package_name` route-rule field) and the live network-connections screen's
+per-app icon/name display (`lib/screens/net_connections_screen.dart`).
+Removing the permission would break both, which this task's own guidance
+says not to do just because one dead screen also used it (shared
+infrastructure, not itself dead).
+
+KNOWN BLOCKER, still not resolved: `QUERY_ALL_PACKAGES` requires an
+explicit Play Console policy justification/declaration before Play Store
+submission — now for the diversion-rule/net-connections use cases
+specifically, since the per-app-routing screen that used to be the
+simplest justification for it no longer exists.
 
 ## Exported Android components
 
-VERIFIED: `AutomationCommandReceiver` changed from
-`exported="true" android:permission="…normal…"` (PR #6's fix — a false
-security boundary, see below) to `exported="false"` — closed entirely, not
-papered over. `TileService` (`BIND_QUICK_SETTINGS_TILE`, system-only
-permission) and `SingBoxVpnService` (`exported="false"`,
-`BIND_VPN_SERVICE`) were already correctly locked down and are unchanged.
+UPDATE (mobile identity pass): `AutomationCommandReceiver` — previously
+changed from `exported="true" android:permission="…normal…"` (PR #6's fix —
+a false security boundary, see below) to `exported="false"` — has now been
+deleted outright, along with its manifest `<receiver>` entry and the dead
+`allowedSenderPackages`/"automation whitelist" settings UI that configured
+it. With the receiver already `exported="false"`, no external Tasker-style
+app could reach it at all, CONNECT/RECONNECT were non-functional stubs, and
+grepping the whole repo turned up no internal caller that sent
+`com.david610.singboxclient.action.{CONNECT,DISCONNECT,RECONNECT}` either —
+so there was no real automation surface left to preserve, only dead code
+and a settings screen pointing at it. `TileService`
+(`BIND_QUICK_SETTINGS_TILE`, system-only permission) and
+`SingBoxVpnService` (`exported="false"`, `BIND_VPN_SERVICE`) were already
+correctly locked down and are unchanged.
 
 KNOWN BLOCKER, not addressed in this pass: `MainActivity` is
 `exported="true"` with no `android:permission`, and accepts external input

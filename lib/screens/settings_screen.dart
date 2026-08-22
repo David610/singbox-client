@@ -38,7 +38,6 @@ import 'package:karing/screens/language_settings_screen.dart';
 import 'package:karing/screens/list_add_screen.dart';
 import 'package:karing/screens/login_step_provider_screen.dart';
 import 'package:karing/screens/my_profiles_screen.dart';
-import 'package:karing/screens/packageid_multi_select_android_screen.dart';
 import 'package:karing/screens/qrcode_screen.dart';
 import 'package:karing/screens/richtext_viewer.screen.dart';
 import 'package:karing/screens/speedtest_settings_screen.dart';
@@ -49,7 +48,6 @@ import 'package:karing/screens/themes.dart';
 import 'package:karing/screens/urltest_settings_screen.dart';
 import 'package:karing/screens/useragent_settings_screen.dart';
 import 'package:karing/screens/uwp_loopback_exemption_windows_screen.dart';
-import 'package:karing/screens/version_update_screen.dart';
 import 'package:karing/screens/webview_helper.dart';
 import 'package:karing/screens/widgets/framework.dart';
 import 'package:karing/screens/widgets/text_field.dart';
@@ -1049,15 +1047,6 @@ class _SettingScreenState extends LasyRenderingState<SettingsScreen> {
       );
     }
     bool disableOrientation = await DeviceUtils.disableOrientation();
-    bool supportAllowedSenderPackages = false;
-    if (Platform.isAndroid) {
-      String version = await FlutterVpnService.getSystemVersion();
-      int? v = int.tryParse(version);
-      const int upsideDownCake = 34;
-      if (v != null && v >= upsideDownCake) {
-        supportAllowedSenderPackages = true;
-      }
-    }
 
     groupOptions.add(
       GroupItem(
@@ -1231,54 +1220,6 @@ class _SettingScreenState extends LasyRenderingState<SettingsScreen> {
                 },
               ),
             ),
-            if (supportAllowedSenderPackages) ...[
-              GroupItemOptions(
-                pushOptions: GroupItemPushOptions(
-                  name: tcontext.SettingsScreen.automationWhitelist,
-                  tips:
-                      "osVersion >= 14\ncom.david610.singboxclient.action.CONNECT\ncom.david610.singboxclient.action.DISCONNECT\ncom.david610.singboxclient.action.RECONNECT",
-                  onPush: () async {
-                    final oldData = settingConfig.allowedSenderPackages.toSet();
-                    await Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        settings: ListAddScreen.routSettings(
-                          "allowedSenderPackages",
-                        ),
-                        builder: (context) => ListAddScreen(
-                          title: tcontext.SettingsScreen.automationWhitelist,
-                          data: settingConfig.allowedSenderPackages,
-                          onTapAdd: () async {
-                            List<String> selectedData = settingConfig
-                                .allowedSenderPackages
-                                .toList();
-
-                            final result = await Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                settings:
-                                    PackageIdMultiSelectAndroidScreen.routSettings(),
-                                builder: (context) =>
-                                    PackageIdMultiSelectAndroidScreen(
-                                      installedApps: [],
-                                      selectedData: selectedData,
-                                    ),
-                              ),
-                            );
-                            return result ?? [];
-                          },
-                        ),
-                      ),
-                    );
-                    final newData = settingConfig.allowedSenderPackages.toSet();
-                    if (oldData.difference(newData).isNotEmpty ||
-                        newData.difference(oldData).isNotEmpty) {
-                      SettingManager.setDirty(true);
-                    }
-                  },
-                ),
-              ),
-            ],
           ],
           if (Platform.isIOS) ...[
             GroupItemOptions(
@@ -1548,6 +1489,14 @@ class _SettingScreenState extends LasyRenderingState<SettingsScreen> {
     setState(() {});
   }
 
+  // The in-app auto-updater (fetch from Karing infra, silently download +
+  // run an installer via VersionUpdateScreen) has been removed -- see
+  // AutoUpdateManager. `versionCheck.newVersion` is now never set true,
+  // so this always falls through to the early return below; the
+  // remaining external-link fallback is kept only in case a future
+  // first-party release feed sets it again, and simply opens the
+  // download page in the user's browser (a user-initiated action) rather
+  // than downloading/running anything in-app.
   Future<void> onTapNewVersion() async {
     AutoUpdateCheckVersion versionCheck = AutoUpdateManager.getVersionCheck();
     if (!versionCheck.newVersion) {
@@ -1560,25 +1509,7 @@ class _SettingScreenState extends LasyRenderingState<SettingsScreen> {
     String url = remoteConfig.download.isEmpty
         ? versionCheck.url
         : remoteConfig.download;
-    if (AutoUpdateManager.isSupport()) {
-      String? installerNew = await AutoUpdateManager.checkReplace();
-      if (installerNew != null) {
-        await Navigator.push(
-          context,
-          MaterialPageRoute(
-            settings: VersionUpdateScreen.routSettings(),
-            builder: (context) => const VersionUpdateScreen(),
-          ),
-        );
-      } else {
-        await UrlLauncherUtils.loadUrl(
-          url,
-          mode: LaunchMode.externalApplication,
-        );
-      }
-    } else {
-      await UrlLauncherUtils.loadUrl(url, mode: LaunchMode.externalApplication);
-    }
+    await UrlLauncherUtils.loadUrl(url, mode: LaunchMode.externalApplication);
   }
 
   Future<void> onTapAddProfile() async {
