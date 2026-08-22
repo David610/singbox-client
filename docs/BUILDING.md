@@ -28,7 +28,7 @@ architecture — see "Known remaining build blockers" below.
 
 | Tool | Version used by this repo |
 |---|---|
-| Flutter | `>=3.35.0` (`pubspec.yaml`) |
+| Flutter | `>=3.44.2` (`pubspec.yaml`; first stable release with Dart 3.12.2) |
 | Dart | `>=3.12.2 <4.0.0` (`pubspec.yaml`) |
 | Android compileSdk/targetSdk | 35 (`android/app/build.gradle.kts`) |
 | Android minSdk | 26 |
