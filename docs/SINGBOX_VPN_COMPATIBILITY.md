@@ -127,17 +127,29 @@ aligned. If either project's pin moves, re-check this alignment — a
 version skew here is exactly the kind of thing that could silently break
 compatibility without any single test catching it.
 
-## CI (not yet implemented — design only, per this task's scope)
+## CI (implemented — updated, this section was stale)
 
-Extends `docs/BUILDING.md`'s CI design:
+The design this section used to describe as "not yet implemented" is now
+real, in `.github/workflows/singbox-vpn-compat.yml` (see `docs/CI.md`):
 
-- `packages/vpn_core/test/singbox_vpn_compat_test.dart` should run on
-  every PR (pure Dart, no external binary needed).
-- `packages/vpn_core/test/interop/` should run with `SING_BOX_BIN` set to
-  a binary built by `native/singbox-go/build_android.sh`'s underlying
-  toolchain (or an equivalent CI step), and — matching singbox-vpn's own
-  `VPN1_REQUIRE_REAL_INTEROP=1` policy — a skip in that suite should be a
-  hard CI failure, not a silent pass, once wired up.
-- Neither of the above exists in CI yet (this repository has no CI at
-  all — see `docs/FORK_ARCHITECTURE_AUDIT.md` §9). This document records
-  intent; `docs/BUILDING.md` tracks the overall CI gap.
+- `parser-and-config-tests` runs `singbox_config_builder_test.dart` and
+  `singbox_vpn_compat_test.dart` on every PR (pure Dart, no external
+  binary).
+- `headless-protocol-interop` builds the pinned `sing-box v1.13.19`
+  binary from source and runs `packages/vpn_core/test/interop/` against
+  it with `VPN_CORE_REQUIRE_REAL_INTEROP=1` — a missing binary is a hard
+  CI failure, not a silent skip, matching the policy this section used to
+  only propose. It additionally runs `test/interop/` at the **app root**
+  (`shipping_config_path_interop_test.dart`) against the real document
+  `VPNService.start()` produces via the actual production call path, not
+  just `SingBoxConfigBuilder` in isolation — this is the test that would
+  have caught the shipping-path P0 (see `test/app/shipping_config_path_test.dart`'s
+  own doc comment).
+- Both were re-run for real, in the sandbox that performed this
+  repository's device-readiness audit, against a freshly-built
+  `sing-box v1.13.19` binary: all parser/config, real REALITY/Hysteria2
+  interop, and shipping-path interop tests passed. This still proves only
+  the config/core/protocol layer — see this document's own "Headless
+  protocol" column definition above and `docs/CI.md`'s "What CI
+  explicitly does NOT prove": nothing here exercises
+  `android.net.VpnService`/`NEPacketTunnelProvider` on a real OS.

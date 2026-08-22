@@ -256,3 +256,90 @@ Conclusion (server/network issue vs. this-app-specific):
    `docs/CLIENT_COMPATIBILITY.md` and interop tests, not this app's issue
    tracker. If only this app fails, that's a real, actionable bug here —
    attach the Diagnostics export from the failing run.
+
+## Structured per-scenario matrix (blank template)
+
+Added by this project's device-readiness audit as a stricter,
+row-per-scenario companion to the "Recording a run" block above — use
+whichever format is more convenient when a real device becomes available;
+they record the same underlying facts. **Every cell below is a literal
+`<fill in>` placeholder.** Nothing in this section has been executed —
+this repository's own sandboxed audit had no physical Android or iOS
+device, and per this document's own honesty rule (and this project's
+explicit instruction), a row only becomes PASS/FAIL once a human actually
+ran that exact test on that exact device and recorded the result here,
+never from code review, a green CI run, or an emulator/simulator.
+
+Columns: **Date** · **Commit** (short git SHA of the exact client build
+under test) · **OS** (exact version) · **Device** (exact model) ·
+**Network** (carrier/ISP, or Wi-Fi network name) · **Transport**
+(VLESS+REALITY / Hysteria2) · **Public IPv4** (as observed *through the
+tunnel*) · **Public IPv6** (as observed through the tunnel, or literally
+"none" if the tunnel/network has none) · **DNS resolver result** (which
+resolver answered, and what) · **Pass/Fail** · **Symptom** (exact
+free-text description, required for any FAIL, optional for PASS).
+
+### Android
+
+| Scenario | Date | Commit | OS | Device | Network | Transport | Public IPv4 | Public IPv6 | DNS resolver result | Pass/Fail | Symptom |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| Wi-Fi | <fill in> | <fill in> | <fill in> | <fill in> | <fill in> | <fill in> | <fill in> | <fill in> | <fill in> | <fill in> | <fill in> |
+| Cellular | <fill in> | <fill in> | <fill in> | <fill in> | <fill in> | <fill in> | <fill in> | <fill in> | <fill in> | <fill in> | <fill in> |
+| Wi-Fi -> cellular handoff | <fill in> | <fill in> | <fill in> | <fill in> | <fill in> | <fill in> | <fill in> | <fill in> | <fill in> | <fill in> | <fill in> |
+| Cellular -> Wi-Fi handoff | <fill in> | <fill in> | <fill in> | <fill in> | <fill in> | <fill in> | <fill in> | <fill in> | <fill in> | <fill in> | <fill in> |
+| Idle / resume | <fill in> | <fill in> | <fill in> | <fill in> | <fill in> | <fill in> | <fill in> | <fill in> | <fill in> | <fill in> | <fill in> |
+| Core / server loss | <fill in> | <fill in> | <fill in> | <fill in> | <fill in> | <fill in> | <fill in> | <fill in> | <fill in> | <fill in> | <fill in> |
+| DNS leak check | <fill in> | <fill in> | <fill in> | <fill in> | <fill in> | <fill in> | <fill in> | <fill in> | <fill in> | <fill in> | <fill in> |
+| IPv4 connectivity | <fill in> | <fill in> | <fill in> | <fill in> | <fill in> | <fill in> | <fill in> | <fill in> | <fill in> | <fill in> | <fill in> |
+| IPv6 connectivity | <fill in> | <fill in> | <fill in> | <fill in> | <fill in> | <fill in> | <fill in> | <fill in> | <fill in> | <fill in> | <fill in> |
+| Large download | <fill in> | <fill in> | <fill in> | <fill in> | <fill in> | <fill in> | <fill in> | <fill in> | <fill in> | <fill in> | <fill in> |
+| Large upload | <fill in> | <fill in> | <fill in> | <fill in> | <fill in> | <fill in> | <fill in> | <fill in> | <fill in> | <fill in> | <fill in> |
+| YouTube (web) | <fill in> | <fill in> | <fill in> | <fill in> | <fill in> | <fill in> | <fill in> | <fill in> | <fill in> | <fill in> | <fill in> |
+| YouTube (native app) | <fill in> | <fill in> | <fill in> | <fill in> | <fill in> | <fill in> | <fill in> | <fill in> | <fill in> | <fill in> | <fill in> |
+| TikTok (web) | <fill in> | <fill in> | <fill in> | <fill in> | <fill in> | <fill in> | <fill in> | <fill in> | <fill in> | <fill in> | <fill in> |
+| TikTok (native app) | <fill in> | <fill in> | <fill in> | <fill in> | <fill in> | <fill in> | <fill in> | <fill in> | <fill in> | <fill in> | <fill in> |
+
+### iOS
+
+| Scenario | Date | Commit | OS | Device | Network | Transport | Public IPv4 | Public IPv6 | DNS resolver result | Pass/Fail | Symptom |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| Wi-Fi | <fill in> | <fill in> | <fill in> | <fill in> | <fill in> | <fill in> | <fill in> | <fill in> | <fill in> | <fill in> | <fill in> |
+| Cellular | <fill in> | <fill in> | <fill in> | <fill in> | <fill in> | <fill in> | <fill in> | <fill in> | <fill in> | <fill in> | <fill in> |
+| Wi-Fi -> cellular handoff | <fill in> | <fill in> | <fill in> | <fill in> | <fill in> | <fill in> | <fill in> | <fill in> | <fill in> | <fill in> | <fill in> |
+| Cellular -> Wi-Fi handoff | <fill in> | <fill in> | <fill in> | <fill in> | <fill in> | <fill in> | <fill in> | <fill in> | <fill in> | <fill in> | <fill in> |
+| Idle / resume | <fill in> | <fill in> | <fill in> | <fill in> | <fill in> | <fill in> | <fill in> | <fill in> | <fill in> | <fill in> | <fill in> |
+| Core / server loss | <fill in> | <fill in> | <fill in> | <fill in> | <fill in> | <fill in> | <fill in> | <fill in> | <fill in> | <fill in> | <fill in> |
+| DNS leak check | <fill in> | <fill in> | <fill in> | <fill in> | <fill in> | <fill in> | <fill in> | <fill in> | <fill in> | <fill in> | <fill in> |
+| IPv4 connectivity | <fill in> | <fill in> | <fill in> | <fill in> | <fill in> | <fill in> | <fill in> | <fill in> | <fill in> | <fill in> | <fill in> |
+| IPv6 connectivity | <fill in> | <fill in> | <fill in> | <fill in> | <fill in> | <fill in> | <fill in> | <fill in> | <fill in> | <fill in> | <fill in> |
+| Large download | <fill in> | <fill in> | <fill in> | <fill in> | <fill in> | <fill in> | <fill in> | <fill in> | <fill in> | <fill in> | <fill in> |
+| Large upload | <fill in> | <fill in> | <fill in> | <fill in> | <fill in> | <fill in> | <fill in> | <fill in> | <fill in> | <fill in> | <fill in> |
+| YouTube (web) | <fill in> | <fill in> | <fill in> | <fill in> | <fill in> | <fill in> | <fill in> | <fill in> | <fill in> | <fill in> | <fill in> |
+| YouTube (native app) | <fill in> | <fill in> | <fill in> | <fill in> | <fill in> | <fill in> | <fill in> | <fill in> | <fill in> | <fill in> | <fill in> |
+| TikTok (web) | <fill in> | <fill in> | <fill in> | <fill in> | <fill in> | <fill in> | <fill in> | <fill in> | <fill in> | <fill in> | <fill in> |
+| TikTok (native app) | <fill in> | <fill in> | <fill in> | <fill in> | <fill in> | <fill in> | <fill in> | <fill in> | <fill in> | <fill in> | <fill in> |
+
+Notes on filling this in:
+
+- **"Core / server loss"**: kill or block the `singbox-vpn` server process
+  (or firewall it off) while connected; record what the client actually
+  does (hangs at CONNECTED with dead traffic? surfaces a
+  DISCONNECTED/error state promptly? auto-retries?) as the Symptom, even
+  on a technical PASS if the recovery UX is bad.
+- **"DNS leak check"**: with the tunnel connected, use an actual DNS-leak
+  test (e.g. a browser hitting a DNS-leak-test site, or comparing the
+  resolver seen by the Diagnostics screen's DNS probe against the
+  tunnel's expected resolver) — the DNS resolver result column should
+  name the actual resolver/answer observed, not just "PASS".
+- **Public IPv6 "none"**: many mobile networks and `singbox-vpn`
+  deployments are IPv4-only end to end — recording "none" here is a
+  legitimate, informative result, not a failure by itself; treat IPv6
+  connectivity failing as an actual FAIL only when the deployment is
+  expected to provide IPv6.
+- This table intentionally duplicates some of the same ground as the 20
+  tests above (e.g. "IPv4/IPv6 connectivity" overlaps tests 1-2, "YouTube
+  (native app)" is test 8) in a stricter, more structured shape per this
+  project's own device-readiness audit request. Filling in one format
+  does not exempt the other — use whichever is asked for by the release
+  process at the time, but never treat a filled cell in one as evidence
+  for the other without an actual matching dated run.
