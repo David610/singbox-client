@@ -57,8 +57,7 @@ void main() {
         final codeOnly = File(path)
             .readAsLinesSync()
             .map((line) {
-              final idx = line.indexOf('//');
-              return idx >= 0 ? line.substring(0, idx) : line;
+              return line.replaceAll(RegExp(r'(?<!:)//.*'), '');
             })
             .join('\n');
         for (final token in _forbiddenTokens) {

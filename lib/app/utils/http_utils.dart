@@ -212,11 +212,11 @@ class HttpUtils {
     required bool requireHttps,
   }) async {
     Uri current = url;
+    final dio = _client(proxyPort, timeout);
     try {
+      dio.options.followRedirects = false;
+      dio.options.maxRedirects = 0;
       for (int hop = 0; hop <= maxRedirects; hop++) {
-        final dio = _client(proxyPort, timeout);
-        dio.options.followRedirects = false;
-        dio.options.maxRedirects = 0;
         final cancelToken = CancelToken();
         final response = await dio.getUri<List<int>>(
           current,
@@ -270,6 +270,8 @@ class HttpUtils {
       return ReturnResult(
         error: ReturnResultError(err.toString(), report: false),
       );
+    } finally {
+      dio.close(force: true);
     }
   }
 

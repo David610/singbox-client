@@ -181,6 +181,37 @@ void main() {
     });
   });
 
+  group('seeded regression credentials (mobile security audit)', () {
+    // Exact seed values used by the mobile security audit's native-logging
+    // methodology (see docs/ notes on that pass): if any of these ever
+    // shows up unredacted in an exported/logged diagnostics string, that is
+    // a confirmed secret leak, not a maybe.
+    const seededUuid = 'TEST_VLESS_UUID_SECRET_123';
+    const seededHy2Password = 'TEST_HYSTERIA_PASSWORD_SECRET_456';
+    const seededSubToken = 'TEST_SUBSCRIPTION_TOKEN_SECRET_789';
+
+    test('redacts the seeded credentials in JSON shape', () {
+      const input =
+          '{"uuid":"$seededUuid","password":"$seededHy2Password",'
+          '"subscription_token":"$seededSubToken"}';
+      final out = redactText(input);
+      expect(out.contains(seededUuid), isFalse);
+      expect(out.contains(seededHy2Password), isFalse);
+      expect(out.contains(seededSubToken), isFalse);
+    });
+
+    test('redacts the seeded credentials with no key context at all '
+        '(shape-aware fallback)', () {
+      const input =
+          'engine panic while dialing: last known uuid was $seededUuid, '
+          'password fallback $seededHy2Password, token $seededSubToken';
+      final out = redactText(input);
+      expect(out.contains(seededUuid), isFalse);
+      expect(out.contains(seededHy2Password), isFalse);
+      expect(out.contains(seededSubToken), isFalse);
+    });
+  });
+
   group('redactKeepingSuffix', () {
     test('shows only the last N characters', () {
       final out = redactKeepingSuffix('9c7e12d1-64c3-46f2-9e21-d707f05c88d9');

@@ -68,6 +68,21 @@
             <data android:scheme="file" />
         </intent>
     </queries>
+    <!-- allowBackup="false": app-private storage (see
+         lib/app/utils/local_storage.dart, lib/app/utils/path_utils.dart)
+         holds live server credentials in plaintext: subscription URLs and
+         tokens, VLESS UUIDs, Hysteria2 passwords, REALITY keys, the raw
+         imported outbound JSON. With no explicit allowBackup or
+         dataExtractionRules, Android defaults to allowBackup="true", which
+         silently includes all of that in Android Auto Backup (Google
+         Drive, once daily on WiFi, idle, and charging) and in `adb backup`
+         for a debuggable build; neither the user nor this app's own
+         explicit zip-based backup/restore feature (see
+         lib/app/utils/backup_and_sync_utils.dart, which is unaffected by
+         this flag) asked for that. Disabling OS-level Auto Backup entirely
+         removes this exposure at zero reliability cost, since profile
+         import, export, and restore already have their own dedicated
+         in-app flow that does not depend on Auto Backup. -->
     <!-- Cleartext (plaintext http://) traffic is disabled by default for
          this app: subscription/profile provisioning and every other
          automatic network path require https://. A narrowly-scoped
@@ -78,6 +93,7 @@
         android:usesCleartextTraffic="false"
         android:banner="@mipmap/ic_tv_banner"
         android:icon="@mipmap/ic_launcher"
+        android:allowBackup="false"
         android:extractNativeLibs="true">
         <activity android:name=".MainActivity" 
             android:exported="true" 
