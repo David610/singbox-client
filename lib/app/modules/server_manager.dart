@@ -1005,8 +1005,7 @@ class ServerManager {
   @visibleForTesting
   static Future<void> hydrateSecureCredentialsFor(ServerConfig config) async {
     for (var group in config.items) {
-      if (group.urlOrPath.isEmpty &&
-          group.urlSecretRef.isNotEmpty) {
+      if (group.urlOrPath.isEmpty && group.urlSecretRef.isNotEmpty) {
         try {
           final value = await CredentialStore.readSubscriptionSecret(
             group.urlSecretRef,
