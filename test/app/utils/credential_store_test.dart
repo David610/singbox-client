@@ -70,10 +70,7 @@ void main() {
   group('server secrets', () {
     test('write then read round-trips the exact payload', () async {
       await CredentialStore.writeServerSecret('ref-1', '{"uuid":"abc"}');
-      expect(
-        await CredentialStore.readServerSecret('ref-1'),
-        '{"uuid":"abc"}',
-      );
+      expect(await CredentialStore.readServerSecret('ref-1'), '{"uuid":"abc"}');
     });
 
     test('read of a never-written ref returns null (missing secret, not '
@@ -91,10 +88,7 @@ void main() {
         'old one (credential rotation without allocating a new key)', () async {
       await CredentialStore.writeServerSecret('ref-1', '{"uuid":"old"}');
       await CredentialStore.writeServerSecret('ref-1', '{"uuid":"new"}');
-      expect(
-        await CredentialStore.readServerSecret('ref-1'),
-        '{"uuid":"new"}',
-      );
+      expect(await CredentialStore.readServerSecret('ref-1'), '{"uuid":"new"}');
     });
 
     test('multiple profiles keep independent secrets under their own '
@@ -200,19 +194,21 @@ void main() {
       );
     });
 
-    test('is a no-op (does not throw) when the backend enumeration fails',
-        () async {
-      await CredentialStore.writeServerSecret('ref-1', 'a');
-      backend.throwOnReadAll = true;
-      await expectLater(
-        CredentialStore.pruneExcept(CredentialStore.serverSecretPrefix, {}),
-        completes,
-      );
-      // Enumeration failed, so nothing could have been (correctly)
-      // identified as orphaned -- the existing entry must survive rather
-      // than being deleted on incomplete information.
-      backend.throwOnReadAll = false;
-      expect(await CredentialStore.readServerSecret('ref-1'), 'a');
-    });
+    test(
+      'is a no-op (does not throw) when the backend enumeration fails',
+      () async {
+        await CredentialStore.writeServerSecret('ref-1', 'a');
+        backend.throwOnReadAll = true;
+        await expectLater(
+          CredentialStore.pruneExcept(CredentialStore.serverSecretPrefix, {}),
+          completes,
+        );
+        // Enumeration failed, so nothing could have been (correctly)
+        // identified as orphaned -- the existing entry must survive rather
+        // than being deleted on incomplete information.
+        backend.throwOnReadAll = false;
+        expect(await CredentialStore.readServerSecret('ref-1'), 'a');
+      },
+    );
   });
 }

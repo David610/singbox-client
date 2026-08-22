@@ -18,7 +18,6 @@ import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:karing/app/modules/server_manager.dart';
-import 'package:karing/app/modules/vpn_service_state.dart';
 import 'package:karing/app/utils/credential_store.dart';
 
 class _FakeBackend implements SecureKeyValueBackend {
@@ -59,11 +58,10 @@ ServerConfigGroupItem _remoteGroup({
   return group;
 }
 
-ProxyConfig _server(String tag, Map<String, dynamic> raw) =>
-    ProxyConfig()
-      ..tag = tag
-      ..type = raw['type'] as String? ?? 'vless'
-      ..raw = raw;
+ProxyConfig _server(String tag, Map<String, dynamic> raw) => ProxyConfig()
+  ..tag = tag
+  ..type = raw['type'] as String? ?? 'vless'
+  ..raw = raw;
 
 void main() {
   late _FakeBackend backend;
@@ -88,7 +86,9 @@ void main() {
             _server('srv-1', {
               'type': 'vless',
               'uuid': 'SECRET_UUID_1',
-              'tls': {'reality': {'public_key': 'SECRET_PBK_1'}},
+              'tls': {
+                'reality': {'public_key': 'SECRET_PBK_1'},
+              },
             }),
           ],
         ),
@@ -135,18 +135,23 @@ void main() {
     // Simulate "restart": decode the saved JSON (as loadServerConfig()
     // does from subscribe.json) into a brand-new ServerConfig, then
     // hydrate it the way loadServerConfig() does.
+    // ServerConfig.fromJson always inserts an empty custom group when the
+    // persisted document has none, so select the migrated group by id.
     final reloaded = ServerConfig()..fromJson(jsonDecode(jsonEncode(json)));
-    expect(reloaded.items.single.servers.single.raw, isNull);
-    expect(reloaded.items.single.urlOrPath, '');
+    final restored = reloaded.items
+        .where((item) => item.groupid == 'g1')
+        .single;
+    expect(restored.servers.single.raw, isNull);
+    expect(restored.urlOrPath, '');
 
     await ServerManager.hydrateSecureCredentialsFor(reloaded);
 
+    expect(restored.servers.single.raw, {
+      'type': 'vless',
+      'uuid': 'SECRET_UUID_1',
+    });
     expect(
-      reloaded.items.single.servers.single.raw,
-      {'type': 'vless', 'uuid': 'SECRET_UUID_1'},
-    );
-    expect(
-      reloaded.items.single.urlOrPath,
+      restored.urlOrPath,
       'https://sub.example.com/link?token=SECRET_TOKEN_1',
     );
   });
@@ -173,19 +178,25 @@ void main() {
     expect(config.items.single.urlSecretRef, firstUrlRef);
   });
 
-  test('missing secret: a ref with nothing in secure storage leaves raw '
-      'null (fails closed) instead of throwing or fabricating a value',
-      () async {
-    final config = ServerConfig()
-      ..items.add(
-        ServerConfigGroupItem()
-          ..groupid = 'g1'
-          ..servers.add(ProxyConfig()..tag = 'srv-1'..secretRef = 'ghost-ref'),
-      );
+  test(
+    'missing secret: a ref with nothing in secure storage leaves raw '
+    'null (fails closed) instead of throwing or fabricating a value',
+    () async {
+      final config = ServerConfig()
+        ..items.add(
+          ServerConfigGroupItem()
+            ..groupid = 'g1'
+            ..servers.add(
+              ProxyConfig()
+                ..tag = 'srv-1'
+                ..secretRef = 'ghost-ref',
+            ),
+        );
 
-    await ServerManager.hydrateSecureCredentialsFor(config);
-    expect(config.items.single.servers.single.raw, isNull);
-  });
+      await ServerManager.hydrateSecureCredentialsFor(config);
+      expect(config.items.single.servers.single.raw, isNull);
+    },
+  );
 
   test('corrupted secure-store entry: an unparsable value leaves raw null '
       'rather than crashing or being used as-is', () async {
@@ -194,7 +205,11 @@ void main() {
       ..items.add(
         ServerConfigGroupItem()
           ..groupid = 'g1'
-          ..servers.add(ProxyConfig()..tag = 'srv-1'..secretRef = 'ref-1'),
+          ..servers.add(
+            ProxyConfig()
+              ..tag = 'srv-1'
+              ..secretRef = 'ref-1',
+          ),
       );
 
     await expectLater(
@@ -237,7 +252,9 @@ void main() {
         _remoteGroup(
           groupid: 'g1',
           url: '',
-          servers: [_server('old', {'type': 'vless', 'uuid': 'old-uuid'})],
+          servers: [
+            _server('old', {'type': 'vless', 'uuid': 'old-uuid'}),
+          ],
         ),
       );
     await ServerManager.buildSecureServerConfigJsonFor(config);
@@ -282,12 +299,16 @@ void main() {
         _remoteGroup(
           groupid: 'g1',
           url: 'https://sub.example.com/one',
-          servers: [_server('a', {'type': 'vless', 'uuid': 'ua'})],
+          servers: [
+            _server('a', {'type': 'vless', 'uuid': 'ua'}),
+          ],
         ),
         _remoteGroup(
           groupid: 'g2',
           url: 'https://sub.example.com/two',
-          servers: [_server('b', {'type': 'hysteria2', 'password': 'pb'})],
+          servers: [
+            _server('b', {'type': 'hysteria2', 'password': 'pb'}),
+          ],
         ),
       ]);
 

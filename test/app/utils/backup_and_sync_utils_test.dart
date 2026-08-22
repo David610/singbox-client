@@ -45,9 +45,7 @@ void main() {
 
   test('a backup zip built from post-migration on-disk files never '
       'contains planted secret material', () async {
-    final tempDir = await Directory.systemTemp.createTemp(
-      'backup_secret_test',
-    );
+    final tempDir = await Directory.systemTemp.createTemp('backup_secret_test');
     addTearDown(() => tempDir.delete(recursive: true));
 
     const plantedUuid = 'PLANTED_SECRET_UUID_should_never_appear';
