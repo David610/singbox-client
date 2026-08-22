@@ -211,6 +211,132 @@ diagnostics screen (already redaction-tested). Everything else inherited
 from Karing should be re-justified against the product scope in section 8
 of this task's own prompt before being ported forward.
 
+## Credential storage (P0, this pass)
+
+VERIFIED (via code reading; **not** verified by an actual test run --
+no Flutter/Dart SDK was available in the sandbox this pass ran in, see
+"Testing" below): before this pass, every VLESS UUID, Hysteria2 password,
+REALITY key, and remote subscription URL/token lived in plaintext inside
+`subscribe.json` (`PathUtils.subscribeFilePath()`) -- `ProxyConfig.raw`
+(the full sing-box outbound JSON for a server, including its auth field)
+and `ServerConfigGroupItem.urlOrPath` (the subscription fetch URL, which
+for `singbox-vpn`-style deployments typically embeds an access token) were
+both serialized directly into that file's JSON via their `toJson()`
+methods, with no encryption.
+
+Fixed: `lib/app/utils/credential_store.dart` adds `CredentialStore`, a
+thin wrapper over `flutter_secure_storage` (already a declared but
+previously **unused** dependency in `pubspec.yaml`) -- Android
+Keystore-backed (`AndroidOptions(encryptedSharedPreferences: true)`), iOS
+Keychain-backed (`IOSOptions(accessibility: KeychainAccessibility.first_unlock)`).
+No custom cryptography was written; this project never touches key
+material directly.
+
+`ServerManager.saveServerConfig()`/`loadServerConfig()` (`lib/app/modules/
+server_manager.dart`) now route through
+`buildSecureServerConfigJsonFor`/`hydrateSecureCredentialsFor`: on save,
+`ProxyConfig.raw` and a remote group's `urlOrPath` are written to
+`CredentialStore` under a stable `secretRef`/`urlSecretRef`, verified by
+an immediate read-back (`CredentialStore.writeAndVerify`), and only then
+omitted from the on-disk JSON (replaced by the ref id). If the secure
+store write or verify fails, the plaintext value is left in the JSON
+untouched -- migration never destroys or blocks a profile, it only
+degrades to "not yet migrated" until secure storage is available again.
+On load, entries with only a ref (no inline plaintext) are hydrated from
+`CredentialStore`; a missing or corrupted secure-store entry leaves the
+field empty/null (logged, never thrown) rather than crashing or
+fabricating a value -- downstream (`ServerManager._configFor`,
+`SingboxConfigBuilder.buildOutbound`) already refuse to build a tunnel
+without a real outbound, so a corrupted credential fails that profile
+closed rather than connecting unauthenticated. Orphaned secure-store
+entries from deleted/replaced profiles are pruned on every save via
+`CredentialStore.pruneExcept`.
+
+Non-secret metadata (`groupid`, `tag`, `remark`, `type`, `server`,
+`serverport`, routing/filter settings, etc.) is unchanged and still lives
+in plain JSON, per this project's separation of metadata from
+credentials.
+
+Tests added (see "Testing" below for the caveat that these were written
+but not executed): `test/app/utils/credential_store_test.dart` (the store
+itself: write/read/delete, write-then-verify success/failure, rotation,
+multiple independent refs, prefix isolation, orphan pruning, enumeration
+failure never throwing), `test/app/modules/
+server_manager_credential_migration_test.dart` (migration, restart/reload
+after migration, idempotency, missing secret, corrupted entry, profile
+deletion, profile replacement/subscription refresh, credential rotation,
+multiple profiles, "no secret written back to plaintext on a successful
+migration / plaintext preserved on a failed one"), plus round-trip
+coverage for the new `secretRef`/`urlSecretRef` fields added to
+`test/app/modules/vpn_service_state_test.dart`.
+
+**Known gap, not fixed this pass**: `ServerDiversionGroupItem` (a
+separate class in `vpn_service_state.dart`, used for
+`diversion_group.json`) also has its own `urlOrPath` field, used for
+diversion-rule-group metadata rather than the primary subscription
+fetch. It was not audited or migrated in this pass -- if it ever carries
+a credential-bearing URL (not confirmed either way), it remains
+plaintext in `diversion_group.json`. Flagged for the next pass rather
+than silently left unmentioned.
+
+## Backup/export security (P0, this pass)
+
+CRITICAL BUG FOUND AND FIXED: `BackupAndSyncUtils.getZipFileNameList()`
+listed `"servers.json"` and `"use.json"` as the files to back up, but the
+real on-disk names (from `PathUtils`) are `"subscribe.json"` and
+`"subscribe_use.json"`. Because `"servers.json"` was marked
+`required: true`, `ServerManager.backupToZip` failed on **every** call --
+`File(path.join(dir, "servers.json")).exists()` was always false, so
+backup was not just insecure, it did not work at all. Fixed in
+`lib/app/utils/backup_and_sync_utils.dart`; `group_helper.dart`'s
+restore-time whitelist already used the correct
+`PathUtils.subscribeFileName()`/`subscribeUseFileName()` calls, which is
+what exposed the mismatch as a bug rather than an intentional
+inconsistency.
+
+Design chosen: **exclude secret material from normal backups** (the
+"acceptable if encrypted backup would add unacceptable complexity" option
+from this pass's own instructions), achieved as a side effect of the
+credential-storage migration above rather than a separate encryption
+layer -- once `subscribe.json` no longer contains plaintext `raw`/
+`urlOrPath`, the existing (now-fixed) zip backup of that file is no
+longer a plaintext credential bundle by construction. Restoring a backup
+on the **same device** keeps working (the secrets are still in that
+device's Keystore/Keychain, looked up by the refs the restored JSON
+carries). Restoring on a **different device** requires re-importing
+credentials/subscriptions -- this is the documented trade-off, not an
+oversight.
+
+No home-grown encryption was added or needed for this design. No
+"include credentials" export mode exists in this codebase to warn users
+about (not found in this pass's search of `server_manager.dart`,
+`backup_and_sync_utils.dart`, or the backup/sync screens) -- if one is
+added later, it must carry an explicit warning per this project's own
+prior instruction.
+
+Test added: `test/app/utils/backup_and_sync_utils_test.dart` -- locks
+`getZipFileNameList()` to the real `PathUtils` names (regression test for
+the bug above) and round-trips a post-migration `subscribe.json` through
+the real `ZipUtils.zip`/`unzip` (package:archive), asserting planted
+secret strings never appear in the restored file.
+
+## Testing (this pass)
+
+**No Flutter/Dart SDK was available in the sandbox this pass ran in** --
+`flutter`/`dart` were not on `PATH` and no installation was found
+anywhere on the filesystem. None of `dart format`, `flutter analyze`,
+`flutter test`, an Android build against the pinned libbox, an iOS build,
+or the real `sing-box check` interop tests could be executed. Every
+change above was reviewed by hand (including a manual brace/paren balance
+check across every edited/added file) but **is not confirmed to compile
+or pass its own tests** by an actual toolchain run. This is a real,
+outstanding gap, not a rounding error -- see the PR/commit description
+for the explicit list of commands that still need to be run (`dart
+format --output=none --set-exit-if-changed .`, `flutter analyze`,
+`flutter test`, `flutter test` under `packages/vpn_core`) before this
+change set can be trusted the way the rest of this document's VERIFIED
+tags imply for prior passes.
+
 ## Notes on scope not touched
 
 Per this task's explicit non-goals, DNS defaults (`8.8.8.8`),
