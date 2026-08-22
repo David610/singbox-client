@@ -59,7 +59,7 @@
          automatic network path require https://. A narrowly-scoped
          debug-only override for local dev servers lives in
          android/app/src/debug/AndroidManifest.xml + its
-         network_security_config -- it never ships in a release build. -->
+         network_security_config; it never ships in a release build. -->
     <application android:label="SingBox Client" android:name=".MyApplication"
         android:usesCleartextTraffic="false"
         android:banner="@mipmap/ic_tv_banner"

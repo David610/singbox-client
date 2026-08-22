@@ -5,8 +5,8 @@
   locally-hosted dev server reachable from an emulator. (Android's
   network-security-config <domain> entries are exact hostnames/IP
   literals, not CIDR ranges, so this intentionally does not open up
-  arbitrary LAN addresses.) All other destinations -- and every
-  release/profile build regardless of destination -- still require HTTPS
+  arbitrary LAN addresses.) All other destinations, and every
+  release/profile build regardless of destination, still require HTTPS
   (base-config below has cleartextTrafficPermitted="false").
 -->
 <network-security-config>
