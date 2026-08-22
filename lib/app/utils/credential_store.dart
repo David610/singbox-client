@@ -86,7 +86,7 @@ class ProfileCredentialStore {
     late Map<String, dynamic> protected;
     try {
       protected = await protect(decoded);
-    } on CredentialStoreException {
+    } catch (_) {
       // A legacy plaintext document remains usable in memory when the
       // platform store is temporarily unavailable. It is never rewritten or
       // partially scrubbed until all secure writes verify successfully.
@@ -122,7 +122,11 @@ class ProfileCredentialStore {
     return Map<String, dynamic>.from(result as Map);
   }
 
-  Future<Object?> _protectValue(Object? value, List<String> path, String? key) async {
+  Future<Object?> _protectValue(
+    Object? value,
+    List<String> path,
+    String? key,
+  ) async {
     if (value is Map) {
       final out = <String, dynamic>{};
       for (final entry in value.entries) {
@@ -148,7 +152,9 @@ class ProfileCredentialStore {
       final storageKey = '$_storagePrefix$id';
       await backend.write(storageKey, _encodeSecret(value));
       if (_decodeSecret(await backend.read(storageKey)) != value) {
-        throw const CredentialStoreException('secure-store verification failed');
+        throw const CredentialStoreException(
+          'secure-store verification failed',
+        );
       }
       return '$referencePrefix$id';
     }
@@ -194,7 +200,9 @@ class ProfileCredentialStore {
       if (value is Map) value.values.forEach(collect);
       if (value is List) value.forEach(collect);
       if (value is String && value.startsWith(referencePrefix)) {
-        referenced.add('$_storagePrefix${value.substring(referencePrefix.length)}');
+        referenced.add(
+          '$_storagePrefix${value.substring(referencePrefix.length)}',
+        );
       }
     }
 
