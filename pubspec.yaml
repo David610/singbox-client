@@ -41,6 +41,7 @@ dependencies:
       path: flutter_inappwebview
   web_socket_channel: 3.0.3 #flutter_test
   dio: 5.10.0
+  meta: 1.18.0
   sqlite_async: 0.14.3
   sqlite3: 3.5.0
   path_provider: 2.1.6

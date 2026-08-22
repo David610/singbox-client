@@ -50,9 +50,12 @@ app.*.symbols
 app.*.map.json
 
 # Android Studio will place build artifacts here
-/android/app/src/debug
 /android/app/src/profile
 /android/app/src/release
+# android/app/src/debug is NOT ignored: it deliberately tracks a narrowly
+# scoped debug-only cleartext exception (loopback/emulator hosts only,
+# never merged into release/profile builds -- see AndroidManifest.xml's
+# usesCleartextTraffic and android/app/src/debug/AndroidManifest.xml).
 /logs
 /.vs
 /*.zip

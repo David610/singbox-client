@@ -49,7 +49,6 @@ import 'package:karing/screens/themes.dart';
 import 'package:karing/screens/urltest_settings_screen.dart';
 import 'package:karing/screens/useragent_settings_screen.dart';
 import 'package:karing/screens/uwp_loopback_exemption_windows_screen.dart';
-import 'package:karing/screens/version_update_screen.dart';
 import 'package:karing/screens/webview_helper.dart';
 import 'package:karing/screens/widgets/framework.dart';
 import 'package:karing/screens/widgets/text_field.dart';
@@ -1548,6 +1547,14 @@ class _SettingScreenState extends LasyRenderingState<SettingsScreen> {
     setState(() {});
   }
 
+  // The in-app auto-updater (fetch from Karing infra, silently download +
+  // run an installer via VersionUpdateScreen) has been removed -- see
+  // AutoUpdateManager. `versionCheck.newVersion` is now never set true,
+  // so this always falls through to the early return below; the
+  // remaining external-link fallback is kept only in case a future
+  // first-party release feed sets it again, and simply opens the
+  // download page in the user's browser (a user-initiated action) rather
+  // than downloading/running anything in-app.
   Future<void> onTapNewVersion() async {
     AutoUpdateCheckVersion versionCheck = AutoUpdateManager.getVersionCheck();
     if (!versionCheck.newVersion) {
@@ -1560,25 +1567,7 @@ class _SettingScreenState extends LasyRenderingState<SettingsScreen> {
     String url = remoteConfig.download.isEmpty
         ? versionCheck.url
         : remoteConfig.download;
-    if (AutoUpdateManager.isSupport()) {
-      String? installerNew = await AutoUpdateManager.checkReplace();
-      if (installerNew != null) {
-        await Navigator.push(
-          context,
-          MaterialPageRoute(
-            settings: VersionUpdateScreen.routSettings(),
-            builder: (context) => const VersionUpdateScreen(),
-          ),
-        );
-      } else {
-        await UrlLauncherUtils.loadUrl(
-          url,
-          mode: LaunchMode.externalApplication,
-        );
-      }
-    } else {
-      await UrlLauncherUtils.loadUrl(url, mode: LaunchMode.externalApplication);
-    }
+    await UrlLauncherUtils.loadUrl(url, mode: LaunchMode.externalApplication);
   }
 
   Future<void> onTapAddProfile() async {

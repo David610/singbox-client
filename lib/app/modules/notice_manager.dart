@@ -1,20 +1,10 @@
 // ignore_for_file: empty_catches, unused_catch_stack
 
-import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
 import 'package:karing/app/utils/file_saver.dart';
-import 'package:karing/app/local_services/vpn_service.dart';
-import 'package:karing/app/modules/remote_config_manager.dart';
-import 'package:karing/app/modules/setting_manager.dart';
-import 'package:karing/app/runtime/return_result.dart';
-import 'package:karing/app/utils/app_lifecycle_state_notify.dart';
-import 'package:karing/app/utils/karing_utils.dart';
-import 'package:karing/app/utils/log.dart';
-import 'package:karing/app/utils/notice_utils.dart';
 import 'package:karing/app/utils/path_utils.dart';
-import 'package:karing/app/modules/vpn_service_state.dart';
 
 class NoticeItem {
   bool readed = true;
@@ -115,18 +105,20 @@ class Notice {
   }
 }
 
+// This used to also poll `https://dot.karing.app/notice2.json` (via
+// KaringUtils.getNotice/HttpUtils) on startup, VPN connect, app resume,
+// and every 3 hours after that -- a silent third-party control-plane
+// fetch that could push arbitrary "notice" content/links into the app.
+// That network check has been deleted, not repointed: this class is now
+// a pure local cache (load/save the last notices this app ever saw, if
+// any were cached from before this change) with no way to add new ones.
 class NoticeLoadAndCheck {
-  bool _checking = false;
   final FileSaver _fileSaver = FileSaver();
-  final Duration _checkDuration = const Duration(hours: 3);
-  Duration _duration = const Duration(hours: 3);
   Notice _notice = Notice();
 
   String name = "";
-  String url = "";
   String filePath = "";
 
-  Function()? checkUpdate;
   Notice get notice => _notice;
 
   Future<Notice> _loadConfig(String filePath) async {
@@ -166,124 +158,25 @@ class NoticeLoadAndCheck {
     _fileSaver.setSavePath(filePath);
     await _fileSaver.saveAsJson(_notice);
   }
-
-  Future<void> check() async {
-    if (url.isEmpty) {
-      return;
-    }
-    if (_checking) {
-      return;
-    }
-    if (SettingManager.getConfig().updateWhenConnected) {
-      final started = await VPNService.getStarted();
-      if (!started) {
-        return;
-      }
-    }
-
-    var last = DateTime.tryParse(_notice.latestCheck);
-    DateTime now = DateTime.now();
-    if (last != null) {
-      Duration dur = now.difference(last);
-      if (dur.inSeconds < _duration.inSeconds) {
-        return;
-      }
-    }
-
-    _notice.latestCheck = now.toString();
-    _checking = true;
-
-    try {
-      ReturnResult<RawNoticeItem> gnotice = await KaringUtils.getNotice(
-        url,
-        SettingManager.getConfig().updateWhenConnected,
-      );
-      _checking = false;
-      if (gnotice.error != null) {
-        _duration = const Duration(minutes: 10);
-        save();
-        return;
-      }
-      _duration = _checkDuration;
-      NoticeItem? item = _notice.getByUpdateTime(
-        gnotice.data!.updateTime.toString(),
-      );
-      if (item != null) {
-        save();
-        return;
-      }
-
-      NoticeItem newItem = NoticeItem();
-      newItem.readed = false;
-      newItem.updateTime = gnotice.data!.updateTime.toString();
-      newItem.expireTime = gnotice.data!.expireTime.toString();
-      newItem.title = name.isEmpty
-          ? gnotice.data!.title
-          : "[$name]${gnotice.data!.title}";
-      newItem.content = gnotice.data!.content;
-      newItem.url = gnotice.data!.url;
-      _notice.items.insert(0, newItem);
-      save();
-
-      Future.delayed(const Duration(milliseconds: 300), () async {
-        checkUpdate?.call();
-      });
-    } catch (err, _) {
-      _checking = false;
-      Log.w("NoticeManager._check exception ${err.toString()}");
-    }
-
-    Future.delayed(_duration, () async {
-      await check();
-    });
-  }
 }
 
 class NoticeManager {
+  // Kept as a no-op event list so existing screens that subscribe to
+  // "a new notice arrived" continue to compile; it is never fired since
+  // nothing populates new notices anymore.
   static final List<void Function()> onEventCheck = [];
 
   static final NoticeLoadAndCheck _selfNotice = NoticeLoadAndCheck();
 
   static Future<void> init() async {
-    var remoteConfig = RemoteConfigManager.getConfig();
-
-    _selfNotice.url = remoteConfig.notice;
     _selfNotice.filePath = await PathUtils.noticeFilePath();
-    _selfNotice.checkUpdate = _onCheckUpdate;
     await _selfNotice.load();
-
-    VPNService.onEventStateChanged.add((
-      FlutterVpnServiceState state,
-      Map<String, String> params,
-    ) async {
-      if (state == FlutterVpnServiceState.connected) {
-        Future.delayed(const Duration(seconds: 3), () async {
-          _selfNotice.check();
-        });
-      }
-    });
-    AppLifecycleStateNofity.onStateResumed(null, () {
-      Future.delayed(const Duration(seconds: 3), () async {
-        _selfNotice.check();
-      });
-    });
-    Future.delayed(const Duration(seconds: 3), () async {
-      _selfNotice.check();
-    });
   }
 
   static Future<void> uninit() async {}
 
   static List<Notice> getNotices() {
     return [_selfNotice.notice];
-  }
-
-  static void _onCheckUpdate() {
-    Future.delayed(const Duration(milliseconds: 300), () async {
-      for (var callback in onEventCheck) {
-        callback();
-      }
-    });
   }
 
   static Future<void> save() async {
