@@ -70,6 +70,43 @@ void main() {
       expect(original.tag, 'srv-1');
       expect(original.raw!['k'], 'v');
     });
+
+    test('secretRef round-trips through JSON as plain metadata', () {
+      final original = ProxyConfig()
+        ..tag = 'srv-1'
+        ..secretRef = 'ref-abc-123';
+      // No `raw` set here -- this is the post-migration on-disk shape:
+      // only `secret_ref` persisted, the credential itself lives in
+      // CredentialStore (see ServerManager._buildSecureServerConfigJson).
+
+      final json = original.toJson();
+      expect(json['secret_ref'], 'ref-abc-123');
+      expect(json.containsKey('raw'), isFalse);
+
+      final decoded = jsonDecode(jsonEncode(json));
+      final restored = ProxyConfig()..fromJson(decoded);
+      expect(restored.secretRef, 'ref-abc-123');
+      expect(restored.raw, isNull);
+    });
+
+    test('toJson omits secret_ref when empty (no stale key on legacy '
+        'plaintext profiles)', () {
+      final original = ProxyConfig()
+        ..tag = 'srv-1'
+        ..raw = {'uuid': 'abc'};
+
+      expect(original.toJson().containsKey('secret_ref'), isFalse);
+    });
+
+    test('clone carries secretRef so a migrated profile stays migrated '
+        'after an in-app edit/duplicate', () {
+      final original = ProxyConfig()
+        ..tag = 'srv-1'
+        ..secretRef = 'ref-1';
+
+      final cloned = original.clone();
+      expect(cloned.secretRef, 'ref-1');
+    });
   });
 
   group('ServerConfigGroupItem', () {
@@ -170,6 +207,34 @@ void main() {
       expect(cloned.groupid, 'g1');
       expect(cloned.servers, isEmpty);
       expect(group.servers, hasLength(1));
+    });
+
+    test('urlSecretRef round-trips through JSON as plain metadata, and '
+        'a migrated group clears url_or_path from the on-disk shape', () {
+      final original = ServerConfigGroupItem()
+        ..groupid = 'g1'
+        ..urlOrPath = ''
+        ..urlSecretRef = 'sub-ref-1';
+      // Post-migration on-disk shape: the subscription URL/token lives in
+      // CredentialStore, only the ref is in plain JSON.
+
+      final json = original.toJson();
+      expect(json['url_secret_ref'], 'sub-ref-1');
+      expect(json['url_or_path'], '');
+
+      final decoded = jsonDecode(jsonEncode(json));
+      final restored = ServerConfigGroupItem()..fromJson(decoded);
+      expect(restored.urlSecretRef, 'sub-ref-1');
+      expect(restored.urlOrPath, '');
+    });
+
+    test('toJson omits url_secret_ref when empty (local file import, or '
+        'not yet migrated)', () {
+      final local = ServerConfigGroupItem()
+        ..groupid = 'g1'
+        ..urlOrPath = '/data/user/0/app/files/imported.json';
+      expect(local.toJson().containsKey('url_secret_ref'), isFalse);
+      expect(local.isRemote(), isFalse);
     });
   });
 
