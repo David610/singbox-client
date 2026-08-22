@@ -47,17 +47,16 @@ abstract class SecureKeyValueBackend {
 class _SecureBackend implements SecureKeyValueBackend {
   const _SecureBackend();
 
-  // encryptedSharedPreferences: true -> Android Keystore-backed
-  // EncryptedSharedPreferences (AES-GCM, key held in Keystore, never on
-  // disk in the clear). accessibility.first_unlock -> iOS Keychain entry
+  // Android: Keystore-backed storage via the plugin (the deprecated
+  // `encryptedSharedPreferences` flag is intentionally not set -- the
+  // plugin now manages the cipher and migrates old data itself).
+  // accessibility.first_unlock -> iOS Keychain entry
   // decryptable only after the device's first unlock since boot (correct
   // trade-off for a VPN client that may need to reconnect from a
   // background/boot-triggered context, while still requiring the device to
   // have been unlocked at least once -- not `whenUnlocked`, which would
   // make credential-dependent reconnects fail while the device is locked).
-  static const AndroidOptions _android = AndroidOptions(
-    encryptedSharedPreferences: true,
-  );
+  static const AndroidOptions _android = AndroidOptions();
   static const IOSOptions _ios = IOSOptions(
     accessibility: KeychainAccessibility.first_unlock,
   );

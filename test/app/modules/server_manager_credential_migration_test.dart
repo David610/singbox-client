@@ -18,7 +18,6 @@ import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:karing/app/modules/server_manager.dart';
-import 'package:karing/app/modules/vpn_service_state.dart';
 import 'package:karing/app/utils/credential_store.dart';
 
 class _FakeBackend implements SecureKeyValueBackend {
