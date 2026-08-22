@@ -135,18 +135,23 @@ void main() {
     // Simulate "restart": decode the saved JSON (as loadServerConfig()
     // does from subscribe.json) into a brand-new ServerConfig, then
     // hydrate it the way loadServerConfig() does.
+    // ServerConfig.fromJson always inserts an empty custom group when the
+    // persisted document has none, so select the migrated group by id.
     final reloaded = ServerConfig()..fromJson(jsonDecode(jsonEncode(json)));
-    expect(reloaded.items.single.servers.single.raw, isNull);
-    expect(reloaded.items.single.urlOrPath, '');
+    final restored = reloaded.items
+        .where((item) => item.groupid == 'g1')
+        .single;
+    expect(restored.servers.single.raw, isNull);
+    expect(restored.urlOrPath, '');
 
     await ServerManager.hydrateSecureCredentialsFor(reloaded);
 
-    expect(reloaded.items.single.servers.single.raw, {
+    expect(restored.servers.single.raw, {
       'type': 'vless',
       'uuid': 'SECRET_UUID_1',
     });
     expect(
-      reloaded.items.single.urlOrPath,
+      restored.urlOrPath,
       'https://sub.example.com/link?token=SECRET_TOKEN_1',
     );
   });
