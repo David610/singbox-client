@@ -16,16 +16,30 @@
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <!-- Fine/coarse location: Android requires this to read the real Wi-Fi
          SSID/BSSID (network_info_plus), used by the Wi-Fi-based diversion
-         rule editor (lib/screens/diversion_group_custom_edit_screen.dart).
-         Kept because real, on-demand code depends on it; removing the
-         feature itself is a product decision, not made in this pass. -->
+         rule editor (lib/screens/diversion_group_custom_edit_screen.dart)
+         to populate sing-box's own `wifi_ssid`/`wifi_bssid` route-rule
+         fields (see lib/app/modules/vpn_service_state.dart). KEPT: this is
+         a real, end-to-end-wired sing-box routing feature, not dead code —
+         removing it would be a routing-config regression, out of scope for
+         a mobile-identity/dead-surface pass. -->
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
-    <!-- QUERY_ALL_PACKAGES: real per-app-routing feature
-         (lib/screens/perapp_android_screen.dart) depends on package
-         enumeration. Flagged as a Play Store policy-review item requiring
-         justification/declaration; kept pending an explicit product
-         decision on whether per-app routing ships, not removed blind. -->
+    <!-- QUERY_ALL_PACKAGES: the dead "Per-App Proxy" VPN include/exclude
+         feature (lib/screens/perapp_android_screen.dart) that used to
+         motivate this permission has been removed — it never actually
+         wired into the native VPN tunnel (no Dart code ever populated
+         SingBoxVpnService's includePackage/excludePackage options). KEPT
+         anyway: full package enumeration (lib/app/utils/
+         package_manager_android.dart) is shared infrastructure still used
+         by two real, wired features — the diversion-rule per-app target
+         picker (group.package, a genuine sing-box `package_name` route
+         rule, see lib/screens/diversion_group_custom_edit_screen.dart and
+         lib/app/modules/vpn_service_state.dart) and the live network
+         connections screen's per-app icon/name display
+         (lib/screens/net_connections_screen.dart). Removing the permission
+         would break both. Still a real Play Store policy-review item
+         (Play Console declaration/justification form) worth revisiting if
+         either of those features is ever cut. -->
     <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES"/>
     <uses-permission android:name="android.permission.CAMERA" />
     <!--TV-->
@@ -115,30 +129,12 @@
                 android:name="android.service.quicksettings.TOGGLEABLE_TILE"
                 android:value="true" />
         </service>
-        <!-- exported="false": a `normal`-level custom permission (the
-             previous fix here) is NOT a real security boundary. Android
-             auto-grants `normal` permissions to any app that simply
-             declares <uses-permission> for it, with no user prompt and no
-             signature/allowlist check, so a malicious app could request it
-             exactly as easily as a legitimate automation app and still
-             silently kill the tunnel. External Tasker-style automation is
-             not a requirement for this product (see docs/CLIENT_PRODUCTION_BASELINE.md);
-             closing the exported surface entirely, rather than papering
-             over it with a permission that only blocks *accidental*
-             collisions, is the actual fix. CONNECT/RECONNECT are already
-             non-functional stubs (see below); DISCONNECT is the only real
-             action, and letting a same-UID caller elsewhere in this app
-             invoke it later if a real use appears is still possible with
-             exported="false". -->
-        <receiver
-            android:name=".AutomationCommandReceiver"
-            android:exported="false">
-            <intent-filter>
-                <action android:name="com.david610.singboxclient.action.CONNECT" />
-                <action android:name="com.david610.singboxclient.action.DISCONNECT" />
-                <action android:name="com.david610.singboxclient.action.RECONNECT" />
-            </intent-filter>
-        </receiver>
+        <!-- AutomationCommandReceiver (Tasker-style automation) was removed:
+             it was already exported="false" (unreachable by any external
+             automation app), CONNECT/RECONNECT were non-functional stubs,
+             and nothing in this app's own Dart/Kotlin code ever sent these
+             broadcasts internally either, so there was no real automation
+             surface left to preserve. See docs/CLIENT_PRODUCTION_BASELINE.md. -->
         <provider android:name="androidx.core.content.FileProvider" android:authorities="${applicationId}.fileProvider" android:exported="false" android:grantUriPermissions="true" tools:replace="android:authorities">
             <meta-data android:name="android.support.FILE_PROVIDER_PATHS" android:resource="@xml/file_paths" tools:replace="android:resource"/>
         </provider>
