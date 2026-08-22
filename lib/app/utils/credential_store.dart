@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math';
 
 import 'package:crypto/crypto.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
@@ -55,9 +56,11 @@ class ProfileCredentialStore {
 
   static const referencePrefix = 'secure-credential:v1:';
   static const storagePrefix = 'singbox-client.profile.v1.';
+  static final Map<String, Future<void>> _pendingWrites = {};
 
   final CredentialBackend backend;
   final String namespace;
+  final Random _random = Random.secure();
 
   String get _storagePrefix => 'singbox-client.$namespace.v1.';
 
@@ -115,6 +118,23 @@ class ProfileCredentialStore {
   }
 
   Future<void> write(File file, Map<String, dynamic> document) async {
+    final lockKey = '$namespace:${file.absolute.path}';
+    final previous = _pendingWrites[lockKey] ?? Future<void>.value();
+    final operation = previous.then(
+      (_) => _write(file, document),
+      onError: (_) => _write(file, document),
+    );
+    _pendingWrites[lockKey] = operation;
+    try {
+      await operation;
+    } finally {
+      if (identical(_pendingWrites[lockKey], operation)) {
+        _pendingWrites.remove(lockKey);
+      }
+    }
+  }
+
+  Future<void> _write(File file, Map<String, dynamic> document) async {
     final protected = await protect(document);
     await _atomicWrite(file, jsonEncode(protected));
     await _deleteUnreferenced(protected);
@@ -122,7 +142,7 @@ class ProfileCredentialStore {
 
   Future<Map<String, dynamic>> protect(Map<String, dynamic> document) async {
     final copied = jsonDecode(jsonEncode(document));
-    final result = await _protectValue(copied, const [], null);
+    final result = await _protectValue(copied, null);
     return Map<String, dynamic>.from(result as Map);
   }
 
@@ -131,33 +151,28 @@ class ProfileCredentialStore {
     return Map<String, dynamic>.from(result as Map);
   }
 
-  Future<Object?> _protectValue(
-    Object? value,
-    List<String> path,
-    String? key,
-  ) async {
+  Future<Object?> _protectValue(Object? value, String? key) async {
     if (value is Map) {
       final out = <String, dynamic>{};
       for (final entry in value.entries) {
         final childKey = entry.key.toString();
-        out[childKey] = await _protectValue(
-          entry.value,
-          [...path, childKey],
-          childKey,
-        );
+        out[childKey] = await _protectValue(entry.value, childKey);
       }
       return out;
     }
     if (value is List) {
       final out = <dynamic>[];
       for (var i = 0; i < value.length; i++) {
-        out.add(await _protectValue(value[i], [...path, '$i'], key));
+        out.add(await _protectValue(value[i], key));
       }
       return out;
     }
     if (value is String && value.isNotEmpty && _isSecretKey(key)) {
       if (value.startsWith(referencePrefix)) return value;
-      final id = sha256.convert(utf8.encode(path.join('/'))).toString();
+      // A fresh opaque identifier is essential for transactional rotation:
+      // overwriting a path-derived key before the JSON commit could make the
+      // old file resolve to a new credential if the file write then failed.
+      final id = _randomId();
       final storageKey = '$_storagePrefix$id';
       await backend.write(storageKey, _encodeSecret(value));
       if (_decodeSecret(await backend.read(storageKey)) != value) {
@@ -168,6 +183,11 @@ class ProfileCredentialStore {
       return '$referencePrefix$id';
     }
     return value;
+  }
+
+  String _randomId() {
+    final bytes = List<int>.generate(24, (_) => _random.nextInt(256));
+    return base64UrlEncode(bytes).replaceAll('=', '');
   }
 
   static bool _isSecretKey(String? key) {
@@ -223,11 +243,15 @@ class ProfileCredentialStore {
     }
   }
 
-  static Future<void> _atomicWrite(File file, String contents) async {
+  Future<void> _atomicWrite(File file, String contents) async {
     await file.parent.create(recursive: true);
-    final temporary = File('${file.path}.credentials.tmp');
-    await temporary.writeAsString(contents, flush: true);
-    await temporary.rename(file.path);
+    final temporary = File('${file.path}.credentials.${_randomId()}.tmp');
+    try {
+      await temporary.writeAsString(contents, flush: true);
+      await temporary.rename(file.path);
+    } finally {
+      if (await temporary.exists()) await temporary.delete();
+    }
   }
 
   static String _encodeSecret(String value) => jsonEncode({

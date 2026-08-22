@@ -8,6 +8,7 @@ class MemoryBackend implements CredentialBackend {
   final values = <String, String>{};
   bool failWrites = false;
   bool throwOnWrite = false;
+  Duration writeDelay = Duration.zero;
 
   @override
   Future<void> delete(String key) async {
@@ -22,6 +23,7 @@ class MemoryBackend implements CredentialBackend {
 
   @override
   Future<void> write(String key, String value) async {
+    if (writeDelay != Duration.zero) await Future<void>.delayed(writeDelay);
     if (throwOnWrite) throw StateError('platform secure store unavailable');
     if (!failWrites) values[key] = value;
   }
@@ -168,4 +170,24 @@ void main() {
     await profileStore.write(file, {'items': []});
     expect(backend.values.keys, everyElement(contains('.settings.')));
   });
+
+  test(
+    'concurrent saves are serialized and leave the newest profile',
+    () async {
+      backend.writeDelay = const Duration(milliseconds: 1);
+      final first = profile('one', 'uuid-one', 'password-one');
+      final second = profile('two', 'uuid-two', 'password-two');
+
+      final firstWrite = store.write(file, first);
+      final secondWrite = store.write(file, second);
+      await Future.wait([firstWrite, secondWrite]);
+
+      expect(await store.readAndMigrate(file), second);
+      expect(backend.values, hasLength(4));
+      expect(
+        directory.listSync().whereType<File>().map((entry) => entry.path),
+        everyElement(isNot(endsWith('.tmp'))),
+      );
+    },
+  );
 }

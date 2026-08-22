@@ -34,6 +34,13 @@ fail closed rather than starting a tunnel with incomplete credentials. A
 successful later save reconciles and deletes entries no longer referenced by
 any profile, covering deletion, replacement, and credential rotation.
 
+Credential rotation uses a fresh cryptographically random opaque reference
+rather than overwriting the value behind an existing reference. Saves targeting
+the same file are serialized. Therefore, if a new JSON document cannot be
+flushed and renamed, the old document continues to reference its old credential
+instead of accidentally resolving to a partially rotated value. Temporary file
+names are unique and are removed after both success and failure.
+
 Uninstall, device migration, Keychain access-group changes, a device security
 reset, or OS-level secure-store loss can make references unrecoverable. The app
 does not try to reconstruct secrets or silently discard profiles in that case;
