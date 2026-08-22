@@ -23,13 +23,31 @@ class BackupAndSyncUtils {
   }
 
   /// The set of per-profile files `backupToZip`/`reloadFromZip` archive --
-  /// matches `PathUtils`' own real file names for each persisted config
-  /// blob.
+  /// must match `PathUtils`' own real on-disk file names
+  /// (`PathUtils.subscribeFileName()` == "subscribe.json",
+  /// `PathUtils.subscribeUseFileName()` == "subscribe_use.json") for each
+  /// persisted config blob, not a guessed/aspirational name. A mismatch
+  /// here made `backupToZip` fail on every call (it looks up a required
+  /// file by this exact name via `File(path.join(dir, file.fileName))` and
+  /// errors out with "not exist" if the file is missing) -- see
+  /// docs/CLIENT_PRODUCTION_BASELINE.md's backup-security section for the
+  /// P0 audit that found and fixed this.
+  ///
+  /// `subscribe.json` no longer carries credential material in plaintext
+  /// (see `ServerManager._buildSecureServerConfigJson` /
+  /// `CredentialStore`) -- VLESS UUIDs, Hysteria2 passwords, REALITY keys,
+  /// and remote subscription URLs/tokens live in the platform Keystore/
+  /// Keychain and are intentionally excluded from this list, so a portable
+  /// backup zip does not become an unencrypted credential bundle. Restoring
+  /// a backup on the same device keeps working (the secrets are still in
+  /// that device's secure store); restoring on a different device requires
+  /// re-importing credentials, which is the documented, safer trade-off
+  /// over bundling raw secrets into every export.
   static List<BackupZipFile> getZipFileNameList() {
     return const [
-      BackupZipFile("servers.json"),
+      BackupZipFile("subscribe.json"),
       BackupZipFile("diversion_group.json"),
-      BackupZipFile("use.json"),
+      BackupZipFile("subscribe_use.json"),
       BackupZipFile("setting.json", required: false),
     ];
   }
