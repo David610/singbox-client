@@ -20,7 +20,7 @@ chosen freely:
 
 | Tool | Pinned to | Source of truth |
 |---|---|---|
-| Flutter | `3.44.9` | See "Flutter version: a real correction" below — `pubspec.yaml`'s declared `flutter: ">=3.35.0"` floor turned out to be inconsistent with its own `sdk: ">=3.12.2 <4.0.0"` constraint; `3.44.9` is the actual earliest stable Flutter release whose bundled Dart SDK satisfies the latter, confirmed against Flutter's own release manifest. |
+| Flutter | `3.44.9` | See "Flutter version: a real correction" below — the package floor is `3.44.2`, the first stable Flutter release whose bundled Dart SDK satisfies `sdk: ">=3.12.2 <4.0.0"`; CI uses the latest patch on that compatible minor. |
 | Dart | `3.12.2`, bundled with the above Flutter release | `pubspec.yaml`: `sdk: ">=3.12.2 <4.0.0"` |
 | JDK | 17 | `android/app/build.gradle.kts` `sourceCompatibility`/`targetCompatibility` |
 | Android compileSdk/buildTools/NDK | 35 / 36.0.0 / 28.2.13676358 | `android/app/build.gradle.kts` (unchanged by CI — fetched via AGP's own SDK auto-download once licenses are pre-accepted) |
@@ -34,7 +34,7 @@ chosen freely:
 ### Flutter version: a real correction
 
 The original pin here was `3.35.7` — "the latest patch of the minor
-version `pubspec.yaml`'s `flutter: ">=3.35.0"` declares as its floor,"
+version `pubspec.yaml` formerly declared as its `flutter: ">=3.35.0"` floor,"
 reasoned entirely from that one line and never actually run. The first
 real CI run of these workflows (PR #2) failed on **every** Flutter-based
 job with the same error:
@@ -45,11 +45,11 @@ Because karing requires SDK version >=3.12.2 <4.0.0, version solving failed.
 ```
 
 Flutter 3.35.7 bundles Dart 3.9.2 — which does not satisfy `pubspec.yaml`'s
-own `sdk: ">=3.12.2 <4.0.0"` constraint. The `flutter: ">=3.35.0"` floor
-and the `sdk: ">=3.12.2"` floor are simply inconsistent with each other as
-written; satisfying the Dart constraint (the one that actually blocks
-`pub get`) requires a materially newer Flutter than the declared floor
-alone would suggest.
+own `sdk: ">=3.12.2 <4.0.0"` constraint. The old `flutter: ">=3.35.0"`
+floor and the `sdk: ">=3.12.2"` floor were inconsistent. Both the root app
+and `packages/vpn_core` now declare `flutter: ">=3.44.2"`, so dependency
+resolution rejects an incompatible Flutter SDK immediately and reports the
+actual supported floor.
 
 Corrected by checking Flutter's own release manifest
 (`https://storage.googleapis.com/flutter_infra_release/releases/releases_linux.json`)

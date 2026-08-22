@@ -210,4 +210,4 @@ packages:
     version: "15.3.0"
 sdks:
   dart: ">=3.12.2 <4.0.0"
-  flutter: ">=3.35.0"
+  flutter: ">=3.44.2"

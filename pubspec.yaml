@@ -5,7 +5,9 @@ publish_to: none
 version: 1.2.24+2704
 environment:
   sdk: ">=3.12.2 <4.0.0"
-  flutter: ">=3.35.0"
+  # Flutter 3.44.2 is the first stable release bundling Dart 3.12.2,
+  # so older Flutter releases cannot satisfy the SDK constraint above.
+  flutter: ">=3.44.2"
 
 dependencies:
   flutter:
