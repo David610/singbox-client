@@ -9,36 +9,25 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SYSTEM_EXEMPTED" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
-    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
-    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
     <uses-permission android:name="android.permission.CHANGE_NETWORK_STATE" />
     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <!-- Fine/coarse location: Android requires this to read the real Wi-Fi
+         SSID/BSSID (network_info_plus), used by the Wi-Fi-based diversion
+         rule editor (lib/screens/diversion_group_custom_edit_screen.dart).
+         Kept because real, on-demand code depends on it; removing the
+         feature itself is a product decision, not made in this pass. -->
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
-    <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" />
+    <!-- QUERY_ALL_PACKAGES: real per-app-routing feature
+         (lib/screens/perapp_android_screen.dart) depends on package
+         enumeration. Flagged as a Play Store policy-review item requiring
+         justification/declaration; kept pending an explicit product
+         decision on whether per-app routing ships, not removed blind. -->
     <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES"/>
-    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
-    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
     <uses-permission android:name="android.permission.CAMERA" />
-    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
-    <uses-permission android:name="android.permission.OBSERVE_GRANT_REVOKE_PERMISSIONS" />
-    <uses-permission android:name="android.permission.RECEIVE_USER_PRESENT" />
-    <!-- Gates AutomationCommandReceiver (below): any app on the device can
-         send an implicit broadcast to an exported receiver with no
-         android:permission, so without this a malicious app could silently
-         kill (or, once CONNECT is wired up, meddle with) the user's VPN
-         tunnel, a real deanonymization/leak vector for a VPN app. Normal
-         protection level (not signature) so genuine automation apps
-         (Tasker etc.) can still declare and use it; it is no longer wide
-         open to every installed app. -->
-    <permission
-        android:name="com.nebula.karing.permission.CONTROL_VPN"
-        android:protectionLevel="normal" />
-    <uses-permission android:name="com.nebula.karing.permission.CONTROL_VPN" />
     <!--TV-->
     <uses-feature android:name="android.software.leanback" android:required="false"/>
     <uses-feature android:name="android.hardware.touchscreen" android:required="false"/>
@@ -65,7 +54,7 @@
             <data android:scheme="file" />
         </intent>
     </queries>
-    <application android:label="Karing" android:name=".MyApplication"
+    <application android:label="SingBox Client" android:name=".MyApplication"
         android:usesCleartextTraffic="true"
         android:banner="@mipmap/ic_tv_banner"
         android:icon="@mipmap/ic_launcher"
@@ -110,7 +99,7 @@
             android:directBootAware="true"
             android:exported="true"
             android:icon="@drawable/ic_tile"
-            android:label="Karing" 
+            android:label="SingBox Client" 
             android:permission="android.permission.BIND_QUICK_SETTINGS_TILE"
             tools:targetApi="n">
             <intent-filter>
@@ -120,22 +109,33 @@
                 android:name="android.service.quicksettings.TOGGLEABLE_TILE"
                 android:value="true" />
         </service>
+        <!-- exported="false": a `normal`-level custom permission (the
+             previous fix here) is NOT a real security boundary. Android
+             auto-grants `normal` permissions to any app that simply
+             declares <uses-permission> for it, with no user prompt and no
+             signature/allowlist check, so a malicious app could request it
+             exactly as easily as a legitimate automation app and still
+             silently kill the tunnel. External Tasker-style automation is
+             not a requirement for this product (see docs/CLIENT_PRODUCTION_BASELINE.md);
+             closing the exported surface entirely, rather than papering
+             over it with a permission that only blocks *accidental*
+             collisions, is the actual fix. CONNECT/RECONNECT are already
+             non-functional stubs (see below); DISCONNECT is the only real
+             action, and letting a same-UID caller elsewhere in this app
+             invoke it later if a real use appears is still possible with
+             exported="false". -->
         <receiver
             android:name=".AutomationCommandReceiver"
-            android:exported="true"
-            android:permission="com.nebula.karing.permission.CONTROL_VPN">
+            android:exported="false">
             <intent-filter>
-                <action android:name="com.nebula.karing.action.CONNECT" />
-                <action android:name="com.nebula.karing.action.DISCONNECT" />
-                <action android:name="com.nebula.karing.action.RECONNECT" />
+                <action android:name="com.david610.singboxclient.action.CONNECT" />
+                <action android:name="com.david610.singboxclient.action.DISCONNECT" />
+                <action android:name="com.david610.singboxclient.action.RECONNECT" />
             </intent-filter>
         </receiver>
         <provider android:name="androidx.core.content.FileProvider" android:authorities="${applicationId}.fileProvider" android:exported="false" android:grantUriPermissions="true" tools:replace="android:authorities">
             <meta-data android:name="android.support.FILE_PROVIDER_PATHS" android:resource="@xml/file_paths" tools:replace="android:resource"/>
         </provider>
-        <meta-data android:name="io.sentry.auto-init" android:value="false" />
-        <!--use https://1024tools.com/uuid to gen uuid for every release-->
-        <meta-data android:name="io.sentry.proguard-uuid" android:value="f7c30b47-2d8b-4e47-9028-8674eb50c0a5" />
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->
         <meta-data android:name="flutterEmbedding" android:value="2" />

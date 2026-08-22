@@ -6,9 +6,9 @@ import 'package:package_info_plus/package_info_plus.dart';
 class AppUtils {
   AppUtils._();
 
-  static const String _name = 'karing';
-  static const String _id = 'com.nebula.karing';
-  static const String _groupId = 'group.com.nebula.karing';
+  static const String _name = 'singbox-client';
+  static const String _id = 'com.david610.singboxclient';
+  static const String _groupId = 'group.com.david610.singboxclient';
   static const String _buildinVersion = '1.2.24';
 
   static PackageInfo? _packageInfo;

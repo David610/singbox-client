@@ -480,7 +480,7 @@ class _SettingScreenState extends LasyRenderingState<SettingsScreen> {
                       repeatable: true,
                     );*/
                     if (Platform.isAndroid) {
-                      //disable x-requested-with: com.nebula.karing on android
+                      //disable x-requested-with: com.david610.singboxclient on android
                       await UrlLauncherUtils.loadUrl(
                         remoteConfig.proxyLeakDetection,
                       );
@@ -1236,7 +1236,7 @@ class _SettingScreenState extends LasyRenderingState<SettingsScreen> {
                 pushOptions: GroupItemPushOptions(
                   name: tcontext.SettingsScreen.automationWhitelist,
                   tips:
-                      "osVersion >= 14\ncom.nebula.karing.action.CONNECT\ncom.nebula.karing.action.DISCONNECT\ncom.nebula.karing.action.RECONNECT",
+                      "osVersion >= 14\ncom.david610.singboxclient.action.CONNECT\ncom.david610.singboxclient.action.DISCONNECT\ncom.david610.singboxclient.action.RECONNECT",
                   onPush: () async {
                     final oldData = settingConfig.allowedSenderPackages.toSet();
                     await Navigator.push(
