@@ -34,4 +34,35 @@ void main() {
     expect(line, isNot(contains('abcdefghijklmnopqrstuvwxyz012345')));
     expect(line, contains('[REDACTED]'));
   });
+
+  test('Log redacts the mobile-security-audit seed credentials before they '
+      'reach any sink', () {
+    // Exact seed values from the mobile security audit's native-logging
+    // methodology: TEST_VLESS_UUID_SECRET_123,
+    // TEST_HYSTERIA_PASSWORD_SECRET_456, TEST_SUBSCRIPTION_TOKEN_SECRET_789.
+    const seededUuid = 'TEST_VLESS_UUID_SECRET_123';
+    const seededHy2Password = 'TEST_HYSTERIA_PASSWORD_SECRET_456';
+    const seededSubToken = 'TEST_SUBSCRIPTION_TOKEN_SECRET_789';
+
+    final captured = <String>[];
+    final original = debugPrint;
+    debugPrint = (String? message, {int? wrapWidth}) {
+      if (message != null) captured.add(message);
+    };
+    try {
+      Log.e(
+        'vpn start failed: "uuid": "$seededUuid", '
+        '"password": "$seededHy2Password", '
+        'subscription_token: $seededSubToken',
+      );
+    } finally {
+      debugPrint = original;
+    }
+
+    expect(captured, isNotEmpty);
+    final line = captured.single;
+    expect(line, isNot(contains(seededUuid)));
+    expect(line, isNot(contains(seededHy2Password)));
+    expect(line, isNot(contains(seededSubToken)));
+  });
 }
