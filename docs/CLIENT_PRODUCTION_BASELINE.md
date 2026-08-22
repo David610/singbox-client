@@ -1,5 +1,15 @@
 # Client production baseline
 
+## Credential storage update
+
+VERIFIED BY AUTOMATED UNIT TESTS (platform behavior remains device-unverified):
+persisted profile secrets are now split out of `subscribe.json` into
+Android-Keystore/iOS-Keychain-backed `flutter_secure_storage`, with verified,
+atomic, idempotent plaintext migration and fail-closed handling of missing or
+corrupted entries. Portable backups exclude profiles and credentials rather
+than exporting them in plaintext. See `docs/CREDENTIAL_STORAGE.md` for the
+exact boundary and remaining risks.
+
 Status of the Phase 1 production-hardening pass on top of PR #6. Every claim
 below is tagged VERIFIED, NOT VERIFIED, KNOWN BLOCKER, or DEFERRED — read
 the tag, not just the sentence. This document does not claim App

@@ -22,15 +22,16 @@ class BackupAndSyncUtils {
         "${two(now.hour)}${two(now.minute)}${two(now.second)}.$zipExtension";
   }
 
-  /// The set of per-profile files `backupToZip`/`reloadFromZip` archive --
-  /// matches `PathUtils`' own real file names for each persisted config
-  /// blob.
+  /// Deliberately metadata-only portable backup.
+  ///
+  /// `subscribe.json` is excluded because its secure-store references are
+  /// device-bound and are unusable without the Android Keystore/iOS Keychain
+  /// entries. Users must re-import subscriptions after restore. This also
+  /// prevents a portable ZIP from becoming a credential export.
   static List<BackupZipFile> getZipFileNameList() {
     return const [
-      BackupZipFile("servers.json"),
       BackupZipFile("diversion_group.json"),
-      BackupZipFile("use.json"),
-      BackupZipFile("setting.json", required: false),
+      BackupZipFile("subscribe_use.json"),
     ];
   }
 

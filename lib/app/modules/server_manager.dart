@@ -22,6 +22,7 @@ import 'package:karing/app/utils/auto_conf_utils.dart';
 import 'package:karing/app/utils/backup_and_sync_utils.dart';
 import 'package:karing/app/utils/clash_api.dart';
 import 'package:karing/app/utils/convert_utils.dart';
+import 'package:karing/app/utils/credential_store.dart';
 import 'package:karing/app/utils/did.dart';
 
 import 'package:karing/app/utils/file_utils.dart';
@@ -460,7 +461,6 @@ class ServerManager {
   static final ServerUse _use = ServerUse();
 
   static final FileSaver _fileSaverUse = FileSaver();
-  static final FileSaver _fileSaverServerConfig = FileSaver();
   static final FileSaver _fileSaverDiversionGroupConfig = FileSaver();
   static bool _updatingSubscription = false;
   static bool _updateLatencyByHistory = false;
@@ -470,7 +470,6 @@ class ServerManager {
 
   static Future<void> init() async {
     _fileSaverUse.setSavePath(await PathUtils.subscribeUseFilePath());
-    _fileSaverServerConfig.setSavePath(await PathUtils.subscribeFilePath());
     _fileSaverDiversionGroupConfig.setSavePath(
       await PathUtils.diversionGroupFilePath(),
     );
@@ -955,7 +954,9 @@ class ServerManager {
     try {
       content = await File(filePath).readAsString();
       if (content.isNotEmpty) {
-        var config = jsonDecode(content);
+        var config = await ProfileCredentialStore(
+          PlatformCredentialBackend(),
+        ).readAndMigrate(File(filePath));
         _serverConfig.fromJson(config);
         int index = 0;
         for (var item in _serverConfig.items) {
@@ -977,7 +978,10 @@ class ServerManager {
   }
 
   static Future<void> saveServerConfig() async {
-    await _fileSaverServerConfig.saveAsJson(_serverConfig);
+    final file = File(await PathUtils.subscribeFilePath());
+    await ProfileCredentialStore(
+      PlatformCredentialBackend(),
+    ).write(file, _serverConfig.toJson());
   }
 
   static Future<void> loadDiversionGroupConfig() async {
