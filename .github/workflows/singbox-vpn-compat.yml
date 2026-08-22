@@ -153,6 +153,20 @@ jobs:
           # protocol validation.
           VPN_CORE_REQUIRE_REAL_INTEROP: "1"
 
+      - name: flutter pub get (app)
+        run: flutter pub get
+
+      - name: Real sing-box check against the actual app shipping path
+        # Validates the EXACT document VPNService.start() produces (via
+        # AutoConfUtils -> VPNService.setServer/start), not just the
+        # isolated SingBoxConfigBuilder output above -- this is the test
+        # that would have caught the real-app-path P0 (single outbound
+        # object sent instead of a complete document).
+        run: flutter test --tags=interop test/interop/
+        env:
+          SING_BOX_BIN: ${{ env.SING_BOX_BIN }}
+          VPN_CORE_REQUIRE_REAL_INTEROP: "1"
+
       - name: Fail if the interop suite silently skipped everything
         if: always()
         run: |
