@@ -125,6 +125,58 @@ jobs:
           unzip -l /tmp/libbox-classes.jar | grep -q 'io/nekohasekai/libbox/PlatformInterface.class' \
             || { echo "::error::libbox.aar's classes.jar is missing io.nekohasekai.libbox.PlatformInterface"; exit 1; }
 
+      - name: Verify libbox.aar's native libraries are 16 KB page-size aligned
+        # Google Play requires (since Nov 2025) that every 64-bit native
+        # library in an app targeting API 35+ be usable on 16 KB
+        # page-size devices: every PT_LOAD program header in the .so must
+        # have an alignment (p_align) of at least 0x4000 (16384) bytes.
+        # 16 KB page-size devices are all 64-bit, so only the 64-bit ABIs
+        # (arm64-v8a, x86_64) are checked -- 32-bit Android never runs
+        # with a 16 KB page size, so armeabi-v7a/x86 alignment is
+        # irrelevant to this requirement.
+        #
+        # This is a real inspection of the actual bytes gomobile/the
+        # sing-box build produced, via llvm-readelf's program-header
+        # dump (`-l`) from the pinned NDK toolchain -- not a version
+        # check, not a metadata check, and not skippable: a misaligned
+        # libbox.so here is a real Google Play upload rejection, not a
+        # theoretical one.
+        env:
+          ANDROID_NDK_HOME: ${{ env.ANDROID_HOME }}/ndk/${{ env.NDK_VERSION }}
+        run: |
+          set -euo pipefail
+          READELF="$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-readelf"
+          test -x "$READELF" || { echo "::error::llvm-readelf not found at $READELF"; exit 1; }
+
+          WORKDIR="$RUNNER_TEMP/libbox-16k-check"
+          rm -rf "$WORKDIR" && mkdir -p "$WORKDIR"
+          unzip -o -q packages/vpn_core/android/libs/libbox.aar -d "$WORKDIR"
+
+          fail=0
+          for abi in arm64-v8a x86_64; do
+            so="$WORKDIR/jni/$abi/libbox.so"
+            test -f "$so" || { echo "::error::$so not found"; fail=1; continue; }
+            echo "### $abi/libbox.so"
+            "$READELF" -lW "$so" | grep -E 'LOAD|Align'
+            aligns="$("$READELF" -lW "$so" | awk '$1 == "LOAD" {print $NF}')"
+            if [ -z "$aligns" ]; then
+              echo "::error::$so has no LOAD segments -- not a valid ELF shared object"
+              fail=1
+              continue
+            fi
+            for align in $aligns; do
+              if [ "$((align))" -lt 16384 ]; then
+                echo "::error::$so has a LOAD segment aligned to $align (< 0x4000/16384) -- incompatible with 16 KB page-size devices"
+                fail=1
+              fi
+            done
+          done
+          if [ "$fail" -ne 0 ]; then
+            echo "::error::libbox.aar's native libraries are not 16 KB page-size compatible. See https://developer.android.com/guide/practices/page-sizes and rebuild sing-box/gomobile against a 16 KB-aware NDK/linker (LOAD segment alignment is controlled by the linker's -z max-page-size flag, which recent NDKs/gomobile pass by default)."
+            exit 1
+          fi
+          echo "All checked ABIs (arm64-v8a, x86_64) are 16 KB page-size aligned."
+
       - name: Set up Flutter ${{ env.FLUTTER_VERSION }}
         uses: subosito/flutter-action@1508160852fb97248640997f7cfb38da241df0ba # v2.9.1
         with:
@@ -185,6 +237,58 @@ jobs:
 
       - name: Build release-configuration APK (throwaway-signed)
         run: flutter build apk --release
+
+      - name: Verify every packaged native library is 16 KB page-size aligned
+        # Same requirement/tooling as the libbox.aar-specific check above,
+        # but run against the actual APKs Gradle produced -- this also
+        # covers every OTHER 64-bit native library pulled in transitively
+        # by any Flutter plugin (sqlite3, grpc, etc.), not just libbox.so,
+        # so a newly-added dependency that ships a misaligned .so is
+        # caught here even if it never touches libbox.aar.
+        env:
+          ANDROID_NDK_HOME: ${{ env.ANDROID_HOME }}/ndk/${{ env.NDK_VERSION }}
+        run: |
+          set -euo pipefail
+          READELF="$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-readelf"
+          test -x "$READELF" || { echo "::error::llvm-readelf not found at $READELF"; exit 1; }
+
+          WORKDIR="$RUNNER_TEMP/apk-16k-check"
+          rm -rf "$WORKDIR" && mkdir -p "$WORKDIR"
+
+          fail=0
+          checked=0
+          for apk in build/app/outputs/flutter-apk/*release*.apk; do
+            unzip -o -q "$apk" -d "$WORKDIR/$(basename "$apk" .apk)"
+            for so in $(find "$WORKDIR/$(basename "$apk" .apk)/lib" -mindepth 2 -maxdepth 2 -name '*.so' 2>/dev/null); do
+              abi_dir="$(basename "$(dirname "$so")")"
+              case "$abi_dir" in
+                arm64-v8a|x86_64) ;; # 64-bit ABIs only -- see comment above
+                *) continue ;;
+              esac
+              checked=$((checked + 1))
+              aligns="$("$READELF" -lW "$so" | awk '$1 == "LOAD" {print $NF}')"
+              if [ -z "$aligns" ]; then
+                echo "::error::$so has no LOAD segments -- not a valid ELF shared object"
+                fail=1
+                continue
+              fi
+              for align in $aligns; do
+                if [ "$((align))" -lt 16384 ]; then
+                  echo "::error::$so has a LOAD segment aligned to $align (< 0x4000/16384) -- incompatible with 16 KB page-size devices"
+                  fail=1
+                fi
+              done
+            done
+          done
+          if [ "$checked" -eq 0 ]; then
+            echo "::error::no 64-bit .so files were found in the built release APK(s) -- the check itself is broken, not passing"
+            exit 1
+          fi
+          if [ "$fail" -ne 0 ]; then
+            echo "::error::the packaged app contains a native library that is not 16 KB page-size compatible. See https://developer.android.com/guide/practices/page-sizes."
+            exit 1
+          fi
+          echo "Checked $checked 64-bit native librar(y/ies) across all release APKs -- all 16 KB page-size aligned."
 
       - name: Upload debug APK
         if: always()
