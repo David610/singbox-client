@@ -16,8 +16,6 @@
 // profile/data-model state with no tunnel behavior of its own.
 library;
 
-import 'dart:convert';
-
 import 'package:karing/app/local_services/vpn_service.dart';
 import 'package:karing/app/modules/board_provider_manager.dart';
 import 'package:karing/app/modules/server_manager.dart';
@@ -755,8 +753,14 @@ class VPNService {
   /// derives it from [getTimeoutByOutboundCount]) but the real vpn_core
   /// plugin manages its own start timeout internally.
   static Future<ReturnResultError?> start(int timeoutMs) async {
+    final VpnCoreConfig config;
     try {
-      await FlutterVpnService.core.start(_configFor(_current));
+      config = _configFor(_current);
+    } catch (err) {
+      return ReturnResultError(err.toString(), report: false);
+    }
+    try {
+      await FlutterVpnService.core.start(config);
       return null;
     } catch (err) {
       return ReturnResultError(err.toString(), report: true);
@@ -768,8 +772,14 @@ class VPNService {
   }
 
   static Future<ReturnResultError?> reload(int timeoutMs) async {
+    final VpnCoreConfig config;
     try {
-      await FlutterVpnService.core.restart(_configFor(_current));
+      config = _configFor(_current);
+    } catch (err) {
+      return ReturnResultError(err.toString(), report: false);
+    }
+    try {
+      await FlutterVpnService.core.restart(config);
       return null;
     } catch (err) {
       return ReturnResultError(err.toString(), report: true);
@@ -777,16 +787,30 @@ class VPNService {
   }
 
   /// Builds the [VpnCoreConfig] handed to the real native core.
-  /// `server.raw` (when present) already holds the parsed proxy-outbound
-  /// JSON this profile was created from; a complete sing-box document
-  /// belongs to `SingboxConfigBuilder` (lib/app/utils/singbox_config_builder.dart),
-  /// which composes it from the full server/diversion/DNS configuration --
-  /// out of scope for this facade itself.
+  ///
+  /// `server.raw` holds the single proxy-outbound JSON this profile was
+  /// created from (see `AutoConfUtils.tryConvert`). [VpnCoreConfig
+  /// .singBoxConfigJson] must be a COMPLETE sing-box configuration document
+  /// (the native side passes it straight to `startOrReloadService` /
+  /// `libbox`, unmodified) -- so this wraps that single outbound into a
+  /// full runtime document via the real, first-party
+  /// `vpn_core` `SingBoxConfigBuilder.buildSingleOutboundDocument`
+  /// (packages/vpn_core/lib/src/config/singbox_config_builder.dart), the
+  /// one authoritative builder for the config the tunnel actually runs.
+  /// This is the only place a [VpnCoreConfig] is constructed for the real
+  /// connection path; a bare outbound object must never cross this
+  /// boundary as `singBoxConfigJson`.
   static VpnCoreConfig _configFor(ProxyConfig server) {
-    return VpnCoreConfig(
-      tag: server.tag,
-      singBoxConfigJson: server.raw != null ? jsonEncode(server.raw) : '{}',
+    final outbound = server.raw;
+    if (outbound == null || outbound.isEmpty) {
+      throw StateError(
+        'no outbound configuration available for server "${server.tag}"',
+      );
+    }
+    final doc = SingBoxConfigBuilder.buildSingleOutboundDocument(
+      outbound: outbound,
     );
+    return VpnCoreConfig(tag: server.tag, singBoxConfigJson: doc);
   }
 
   static ReturnResultError convertErr(Object result) {
