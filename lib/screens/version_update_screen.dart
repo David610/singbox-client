@@ -6,7 +6,6 @@ import 'dart:ui';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:app_installer/app_installer.dart';
 import 'package:karing/app/modules/vpn_service_state.dart';
 import 'package:karing/app/modules/auto_update_manager.dart';
 import 'package:karing/app/modules/setting_manager.dart';
@@ -164,8 +163,6 @@ class _VersionUpdateScreenState
       } else if (Platform.isMacOS) {
         await launchUrl(Uri(path: installer, scheme: 'file'));
         await ServicesBinding.instance.exitApplication(AppExitType.required);
-      } else if (Platform.isAndroid) {
-        await AppInstaller.installApk(installer);
       } else if (Platform.isLinux) {
         if (!mounted) {
           return;

@@ -21,11 +21,6 @@ public final class GeneratedPluginRegistrant {
       Log.e(TAG, "Error registering plugin android_package_manager, lab.neruno.android_package_manager.AndroidPackageManagerPlugin", e);
     }
     try {
-      flutterEngine.getPlugins().add(new com.zero.app_installer.AppInstallerPlugin());
-    } catch (Exception e) {
-      Log.e(TAG, "Error registering plugin app_installer, com.zero.app_installer.AppInstallerPlugin", e);
-    }
-    try {
       flutterEngine.getPlugins().add(new com.spencerccf.app_settings.AppSettingsPlugin());
     } catch (Exception e) {
       Log.e(TAG, "Error registering plugin app_settings, com.spencerccf.app_settings.AppSettingsPlugin", e);
@@ -86,11 +81,6 @@ public final class GeneratedPluginRegistrant {
       Log.e(TAG, "Error registering plugin image_picker_android, io.flutter.plugins.imagepicker.ImagePickerPlugin", e);
     }
     try {
-      flutterEngine.getPlugins().add(new com.github.dart_lang.jni.JniPlugin());
-    } catch (Exception e) {
-      Log.e(TAG, "Error registering plugin jni, com.github.dart_lang.jni.JniPlugin", e);
-    }
-    try {
       flutterEngine.getPlugins().add(new com.sayegh.move_to_background.MoveToBackgroundPlugin());
     } catch (Exception e) {
       Log.e(TAG, "Error registering plugin move_to_background, com.sayegh.move_to_background.MoveToBackgroundPlugin", e);
@@ -129,11 +119,6 @@ public final class GeneratedPluginRegistrant {
       flutterEngine.getPlugins().add(new io.flutter.plugins.quickactions.QuickActionsPlugin());
     } catch (Exception e) {
       Log.e(TAG, "Error registering plugin quick_actions_android, io.flutter.plugins.quickactions.QuickActionsPlugin", e);
-    }
-    try {
-      flutterEngine.getPlugins().add(new io.sentry.flutter.SentryFlutterPlugin());
-    } catch (Exception e) {
-      Log.e(TAG, "Error registering plugin sentry_flutter, io.sentry.flutter.SentryFlutterPlugin", e);
     }
     try {
       flutterEngine.getPlugins().add(new dev.fluttercommunity.plus.share.SharePlusPlugin());

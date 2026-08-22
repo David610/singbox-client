@@ -23,7 +23,6 @@ import 'package:karing/app/modules/biz.dart';
 import 'package:karing/app/modules/remote_config_manager.dart';
 import 'package:karing/app/modules/setting_manager.dart';
 import 'package:karing/app/modules/auto_update_manager.dart';
-import 'package:karing/app/private/sentry_utils_private.dart';
 import 'package:karing/app/utils/app_args.dart';
 import 'package:karing/app/utils/app_utils.dart';
 //import 'package:karing/app/utils/geoip_subnet_utils.dart';
@@ -138,9 +137,6 @@ void main(List<String> args) async {
   await RemoteConfigManager.init();
   await SettingManager.init();
   await BoardProviderManager.init();
-  if (!SettingManager.getConfig().disableAppImproveData) {
-    await SentryUtilsPrivate.init();
-  }
   if (PlatformUtils.isPC()) {
     await _ensureSingleInstanceOrExit();
   }

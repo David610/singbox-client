@@ -68,17 +68,6 @@ class RemoteConfigManager {
     return _config;
   }
 
-  static bool rejectSentrySubmit() {
-    var minVersion = _config.sentryMinVersion;
-    if (minVersion.isNotEmpty) {
-      String version = AppUtils.getBuildinVersion();
-      if (VersionCompareUtils.compareVersion(version, minVersion) < 0) {
-        return true;
-      }
-    }
-    return false;
-  }
-
   static bool rejectAnalyticsSubmit() {
     var minVersion = _config.analyticsMinVersion;
     if (minVersion.isNotEmpty) {
