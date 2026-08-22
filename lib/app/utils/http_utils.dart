@@ -7,6 +7,7 @@ import 'package:dio/dio.dart';
 import 'package:dio/io.dart';
 import 'package:karing/app/runtime/return_result.dart';
 import 'package:karing/app/utils/app_utils.dart';
+import 'package:meta/meta.dart';
 import 'package:tuple/tuple.dart';
 
 class HttpUtils {
@@ -78,6 +79,198 @@ class HttpUtils {
       return compatibles.first;
     }
     return '${compatibles.first} +${compatibles.length - 1}';
+  }
+
+  /// Bounded, HTTPS-only GET intended for fetching remote subscription /
+  /// profile content from a user-supplied URL. Unlike [httpGetRequest]
+  /// this:
+  ///  - rejects any URL that isn't `https://` up front (no cleartext
+  ///    "subscription" provisioning, and no other custom schemes);
+  ///  - never follows a redirect off of https (an https-\>http downgrade
+  ///    redirect is rejected, not silently followed);
+  ///  - caps the number of redirect hops (default 5);
+  ///  - caps the response body size (default 5 MiB), aborting the
+  ///    transfer as soon as the cap is exceeded rather than buffering an
+  ///    unbounded response into memory first.
+  static const int kMaxRemoteContentBytes = 5 * 1024 * 1024;
+  static const int kMaxRemoteContentRedirects = 5;
+
+  static Future<ReturnResult<Tuple2<int, String>>> httpGetRequestSecure(
+    String url,
+    int? proxyPort,
+    String? userAgent,
+    Duration timeout,
+    Map<String, String>? headers, {
+    int maxRedirects = kMaxRemoteContentRedirects,
+    int maxBytes = kMaxRemoteContentBytes,
+  }) async {
+    Uri? current = Uri.tryParse(url);
+    if (current == null || !current.hasScheme) {
+      return ReturnResult(
+        error: ReturnResultError('invalid URL: $url', report: false),
+      );
+    }
+    if (current.scheme.toLowerCase() != 'https') {
+      return ReturnResult(
+        error: ReturnResultError(
+          'only https:// URLs are supported for remote subscription/profile fetch',
+          report: false,
+        ),
+      );
+    }
+    return _fetchBounded(
+      current,
+      proxyPort,
+      userAgent,
+      timeout,
+      headers,
+      maxRedirects: maxRedirects,
+      maxBytes: maxBytes,
+      requireHttps: true,
+    );
+  }
+
+  /// Test-only escape hatch onto the same bounded-redirect/bounded-size
+  /// fetch mechanics [httpGetRequestSecure] uses, but against a plain
+  /// `http://` URL (e.g. a `dart:io` `HttpServer` bound to loopback in a
+  /// test) so the redirect-cap/size-cap/status-handling logic can be
+  /// exercised without standing up TLS. Production code must always go
+  /// through [httpGetRequestSecure], which enforces https:// first --
+  /// this bypasses only that outer scheme gate, not the mechanics.
+  @visibleForTesting
+  static Future<ReturnResult<Tuple2<int, String>>> fetchBoundedForTesting(
+    Uri url, {
+    int maxRedirects = kMaxRemoteContentRedirects,
+    int maxBytes = kMaxRemoteContentBytes,
+  }) {
+    return _fetchBounded(
+      url,
+      null,
+      null,
+      const Duration(seconds: 5),
+      null,
+      maxRedirects: maxRedirects,
+      maxBytes: maxBytes,
+      requireHttps: false,
+    );
+  }
+
+  /// Test-only: the same downgrade-safe redirect-target validation used
+  /// inside [_fetchBounded], exposed directly so the https-\>http
+  /// downgrade rejection can be unit tested without any I/O at all.
+  @visibleForTesting
+  static ReturnResult<Uri> validateRedirectTargetForTesting(
+    Uri current,
+    String? location, {
+    bool requireHttps = true,
+  }) => _validateRedirectTarget(current, location, requireHttps);
+
+  static ReturnResult<Uri> _validateRedirectTarget(
+    Uri current,
+    String? location,
+    bool requireHttps,
+  ) {
+    if (location == null || location.isEmpty) {
+      return ReturnResult(
+        error: ReturnResultError(
+          'redirect with no Location header',
+          report: false,
+        ),
+      );
+    }
+    Uri? next = Uri.tryParse(location);
+    if (next == null) {
+      return ReturnResult(
+        error: ReturnResultError(
+          'invalid redirect location: $location',
+          report: false,
+        ),
+      );
+    }
+    if (!next.hasScheme) {
+      next = current.resolveUri(next);
+    }
+    if (requireHttps && next.scheme.toLowerCase() != 'https') {
+      return ReturnResult(
+        error: ReturnResultError(
+          'refusing to follow redirect to non-https URL',
+          report: false,
+        ),
+      );
+    }
+    return ReturnResult(data: next);
+  }
+
+  static Future<ReturnResult<Tuple2<int, String>>> _fetchBounded(
+    Uri url,
+    int? proxyPort,
+    String? userAgent,
+    Duration timeout,
+    Map<String, String>? headers, {
+    required int maxRedirects,
+    required int maxBytes,
+    required bool requireHttps,
+  }) async {
+    Uri current = url;
+    try {
+      for (int hop = 0; hop <= maxRedirects; hop++) {
+        final dio = _client(proxyPort, timeout);
+        dio.options.followRedirects = false;
+        dio.options.maxRedirects = 0;
+        final cancelToken = CancelToken();
+        final response = await dio.getUri<List<int>>(
+          current,
+          options: Options(
+            responseType: ResponseType.bytes,
+            headers: {'User-Agent': ?userAgent, ...?headers},
+            validateStatus: (_) => true,
+          ),
+          cancelToken: cancelToken,
+          onReceiveProgress: (received, total) {
+            if (received > maxBytes) {
+              cancelToken.cancel('response exceeds max allowed size');
+            }
+          },
+        );
+        final statusCode = response.statusCode ?? 0;
+        if (statusCode >= 300 && statusCode < 400) {
+          final target = _validateRedirectTarget(
+            current,
+            response.headers.value('location'),
+            requireHttps,
+          );
+          if (target.error != null) {
+            return ReturnResult(error: target.error);
+          }
+          current = target.data!;
+          continue;
+        }
+        if (statusCode < 200 || statusCode >= 300) {
+          return ReturnResult(
+            error: ReturnResultError('HTTP $statusCode', report: false),
+          );
+        }
+        final data = response.data ?? const <int>[];
+        if (data.length > maxBytes) {
+          return ReturnResult(
+            error: ReturnResultError(
+              'response exceeds max allowed size',
+              report: false,
+            ),
+          );
+        }
+        return ReturnResult(
+          data: Tuple2(statusCode, String.fromCharCodes(data)),
+        );
+      }
+      return ReturnResult(
+        error: ReturnResultError('too many redirects', report: false),
+      );
+    } catch (err) {
+      return ReturnResult(
+        error: ReturnResultError(err.toString(), report: false),
+      );
+    }
   }
 
   static Future<ReturnResult<Tuple2<int, String>>> httpGetRequest(

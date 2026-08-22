@@ -25,6 +25,13 @@ import 'package:karing/app/runtime/return_result.dart';
 import 'package:karing/app/utils/http_utils.dart';
 
 class AutoConfUtils {
+  // Bound how long a pasted/scanned/shared subscription URL or piece of
+  // raw content can be before we even try to act on it -- this is a
+  // cheap guard against pathologically large deep-link/SEND-intent/QR
+  // input, independent of the response-size cap applied to whatever a
+  // remote server sends back.
+  static const int kMaxUrlOrPathLength = 8 * 1024;
+
   static Future<ReturnResultError?> tryConvert(
     String urlOrPath,
     bool local,
@@ -34,6 +41,10 @@ class AutoConfUtils {
     ServerDiversionGroupItem? diversionGroupItem,
     RemoteContent? remoteContent,
   ) async {
+    if (urlOrPath.length > kMaxUrlOrPathLength) {
+      return ReturnResultError("url or path too long", report: false);
+    }
+
     String content;
     if (remoteContent != null && remoteContent.text.isNotEmpty) {
       content = remoteContent.text;
@@ -44,12 +55,27 @@ class AutoConfUtils {
         return ReturnResultError(err.toString(), report: false);
       }
     } else {
-      final result = await HttpUtils.httpGetRequest(
+      // Remote fetch: reject anything that isn't a well-formed https://
+      // URL before making any request -- no cleartext http://, no
+      // file://, no custom schemes, no unparsable garbage. This also
+      // rejects a downgrade to http:// on redirect and caps both the
+      // number of redirects and the response size (see
+      // HttpUtils.httpGetRequestSecure).
+      final uri = Uri.tryParse(urlOrPath);
+      if (uri == null || !uri.hasScheme) {
+        return ReturnResultError("invalid subscription URL", report: false);
+      }
+      if (uri.scheme.toLowerCase() != 'https') {
+        return ReturnResultError(
+          "only https:// subscription URLs are supported",
+          report: false,
+        );
+      }
+      final result = await HttpUtils.httpGetRequestSecure(
         urlOrPath,
         null,
         null,
         const Duration(seconds: 15),
-        null,
         null,
       );
       if (result.error != null) {

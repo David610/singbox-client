@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Debug-build-only manifest fragment, merged only into debug builds
+  (never release/profile). It narrowly re-enables cleartext HTTP, scoped
+  by network_security_config_debug.xml to just the loopback/emulator-host
+  addresses a local Flutter dev server or `flutter run` debug tooling
+  might use (localhost, 10.0.2.2 the Android emulator's host-loopback
+  alias, and private LAN ranges for a physical test device on the same
+  Wi-Fi as a dev machine). Every other host still requires https:// even
+  in debug builds -- this is not a blanket cleartext allowance.
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+    <application
+        android:usesCleartextTraffic="true"
+        android:networkSecurityConfig="@xml/network_security_config_debug"
+        tools:replace="android:usesCleartextTraffic,android:networkSecurityConfig" />
+</manifest>

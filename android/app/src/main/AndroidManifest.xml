@@ -54,8 +54,14 @@
             <data android:scheme="file" />
         </intent>
     </queries>
+    <!-- Cleartext (plaintext http://) traffic is disabled by default for
+         this app: subscription/profile provisioning and every other
+         automatic network path require https://. A narrowly-scoped
+         debug-only override for local dev servers lives in
+         android/app/src/debug/AndroidManifest.xml + its
+         network_security_config -- it never ships in a release build. -->
     <application android:label="SingBox Client" android:name=".MyApplication"
-        android:usesCleartextTraffic="true"
+        android:usesCleartextTraffic="false"
         android:banner="@mipmap/ic_tv_banner"
         android:icon="@mipmap/ic_launcher"
         android:extractNativeLibs="true">

@@ -2720,6 +2720,11 @@ class GroupHelper {
     if (downloadUri == null) {
       return ReturnResultError("invalid URL: $url");
     }
+    if (downloadUri.scheme.toLowerCase() != 'https') {
+      return ReturnResultError(
+        "only https:// backup restore URLs are supported",
+      );
+    }
     if (!context.mounted) {
       return null;
     }
