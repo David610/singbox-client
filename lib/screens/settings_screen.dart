@@ -38,7 +38,6 @@ import 'package:karing/screens/language_settings_screen.dart';
 import 'package:karing/screens/list_add_screen.dart';
 import 'package:karing/screens/login_step_provider_screen.dart';
 import 'package:karing/screens/my_profiles_screen.dart';
-import 'package:karing/screens/packageid_multi_select_android_screen.dart';
 import 'package:karing/screens/qrcode_screen.dart';
 import 'package:karing/screens/richtext_viewer.screen.dart';
 import 'package:karing/screens/speedtest_settings_screen.dart';
@@ -1049,15 +1048,6 @@ class _SettingScreenState extends LasyRenderingState<SettingsScreen> {
       );
     }
     bool disableOrientation = await DeviceUtils.disableOrientation();
-    bool supportAllowedSenderPackages = false;
-    if (Platform.isAndroid) {
-      String version = await FlutterVpnService.getSystemVersion();
-      int? v = int.tryParse(version);
-      const int upsideDownCake = 34;
-      if (v != null && v >= upsideDownCake) {
-        supportAllowedSenderPackages = true;
-      }
-    }
 
     groupOptions.add(
       GroupItem(
@@ -1231,54 +1221,6 @@ class _SettingScreenState extends LasyRenderingState<SettingsScreen> {
                 },
               ),
             ),
-            if (supportAllowedSenderPackages) ...[
-              GroupItemOptions(
-                pushOptions: GroupItemPushOptions(
-                  name: tcontext.SettingsScreen.automationWhitelist,
-                  tips:
-                      "osVersion >= 14\ncom.david610.singboxclient.action.CONNECT\ncom.david610.singboxclient.action.DISCONNECT\ncom.david610.singboxclient.action.RECONNECT",
-                  onPush: () async {
-                    final oldData = settingConfig.allowedSenderPackages.toSet();
-                    await Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        settings: ListAddScreen.routSettings(
-                          "allowedSenderPackages",
-                        ),
-                        builder: (context) => ListAddScreen(
-                          title: tcontext.SettingsScreen.automationWhitelist,
-                          data: settingConfig.allowedSenderPackages,
-                          onTapAdd: () async {
-                            List<String> selectedData = settingConfig
-                                .allowedSenderPackages
-                                .toList();
-
-                            final result = await Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                settings:
-                                    PackageIdMultiSelectAndroidScreen.routSettings(),
-                                builder: (context) =>
-                                    PackageIdMultiSelectAndroidScreen(
-                                      installedApps: [],
-                                      selectedData: selectedData,
-                                    ),
-                              ),
-                            );
-                            return result ?? [];
-                          },
-                        ),
-                      ),
-                    );
-                    final newData = settingConfig.allowedSenderPackages.toSet();
-                    if (oldData.difference(newData).isNotEmpty ||
-                        newData.difference(oldData).isNotEmpty) {
-                      SettingManager.setDirty(true);
-                    }
-                  },
-                ),
-              ),
-            ],
           ],
           if (Platform.isIOS) ...[
             GroupItemOptions(
