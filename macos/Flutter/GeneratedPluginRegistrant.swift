@@ -5,7 +5,6 @@
 import FlutterMacOS
 import Foundation
 
-import app_installer
 import app_settings
 import build_info_macos
 import connectivity_plus
@@ -25,14 +24,12 @@ import path_provider_foundation
 import protocol_handler
 import screen_capturer_macos
 import screen_retriever_macos
-import sentry_flutter
 import share_plus
 import tray_manager
 import url_launcher_macos
 import window_manager
 
 func RegisterGeneratedPlugins(registry: FlutterPluginRegistry) {
-  AppInstallerPlugin.register(with: registry.registrar(forPlugin: "AppInstallerPlugin"))
   AppSettingsPlugin.register(with: registry.registrar(forPlugin: "AppSettingsPlugin"))
   BuildInfoPlugin.register(with: registry.registrar(forPlugin: "BuildInfoPlugin"))
   ConnectivityPlusPlugin.register(with: registry.registrar(forPlugin: "ConnectivityPlusPlugin"))
@@ -52,7 +49,6 @@ func RegisterGeneratedPlugins(registry: FlutterPluginRegistry) {
   ProtocolHandlerPlugin.register(with: registry.registrar(forPlugin: "ProtocolHandlerPlugin"))
   ScreenCapturerMacosPlugin.register(with: registry.registrar(forPlugin: "ScreenCapturerMacosPlugin"))
   ScreenRetrieverMacosPlugin.register(with: registry.registrar(forPlugin: "ScreenRetrieverMacosPlugin"))
-  SentryFlutterPlugin.register(with: registry.registrar(forPlugin: "SentryFlutterPlugin"))
   SharePlusMacosPlugin.register(with: registry.registrar(forPlugin: "SharePlusMacosPlugin"))
   TrayManagerPlugin.register(with: registry.registrar(forPlugin: "TrayManagerPlugin"))
   UrlLauncherPlugin.register(with: registry.registrar(forPlugin: "UrlLauncherPlugin"))

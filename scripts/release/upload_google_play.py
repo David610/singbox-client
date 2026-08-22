@@ -32,7 +32,7 @@ ALLOWED_TRACKS = {"internal", "alpha", "beta"}
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--package-name", required=True, help="e.g. com.nebula.karing")
+    parser.add_argument("--package-name", required=True, help="e.g. com.david610.singboxclient")
     parser.add_argument("--aab", required=True, help="path to the signed .aab file")
     parser.add_argument(
         "--track",

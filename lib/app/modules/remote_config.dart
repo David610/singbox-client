@@ -75,7 +75,6 @@ class RemoteConfigDonate {
 }
 
 class RemoteConfig {
-  static const String kDefaultSentry = "o4508911573663744.ingest.sentry.io";
   static const String kDefaultHost = "karing.app";
   static const String kDefaultNotice = "https://dot.$kDefaultHost/notice2.json";
   static const String kDefaultConfig = "https://dot.$kDefaultHost/config.json";
@@ -109,7 +108,6 @@ class RemoteConfig {
   String latestCheck = "";
   List<String> forwards = [];
   List<String> nowarp = ["us", "cn", "ru"];
-  String sentryMinVersion = "";
   String analyticsMinVersion = "";
   bool ispBindNeedConnect = true;
   String ispPanelJs = "";
@@ -122,7 +120,6 @@ class RemoteConfig {
   String autoUpdate = kDefaultAutoUpdate;
   String outpost = kDefaultOutpost;
 
-  String sentry = kDefaultSentry;
   String getTranffic = kDefaultGetTranffic;
   String getTranfficFrom = kDefaultGetTranfficFrom;
   String tutorial = kDefaultTutorial;
@@ -146,7 +143,6 @@ class RemoteConfig {
       'latest_check': latestCheck,
       'forwards': forwards,
       'nowarp': nowarp,
-      "sentry_min_version": sentryMinVersion,
       "analytics_min_version": analyticsMinVersion,
       "isp_bind_need_connect": ispBindNeedConnect,
       "isp_panel_js": ispPanelJs,
@@ -155,9 +151,6 @@ class RemoteConfig {
       "channel": channels,
     };
 
-    if (sentry != kDefaultSentry) {
-      ret["sentry"] = sentry;
-    }
     if (getTranffic != kDefaultGetTranffic) {
       ret["get_tranffic"] = getTranffic;
     }
@@ -228,7 +221,6 @@ class RemoteConfig {
       "ru",
     ])!;
 
-    sentryMinVersion = map["sentry_min_version"] ?? "";
     analyticsMinVersion = map["analytics_min_version"] ?? "";
 
     faqAnchor = ConvertUtils.getListStringFromDynamic(
@@ -258,7 +250,6 @@ class RemoteConfig {
       host = kDefaultHost;
     }*/
 
-    sentry = map["sentry"] ?? kDefaultSentry;
     getTranffic = map["get_tranffic"] ?? kDefaultGetTranffic;
     getTranfficFrom = map["get_tranffic_from"] ?? kDefaultGetTranfficFrom;
     tutorial = map["tutorial"] ?? kDefaultTutorial;

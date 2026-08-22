@@ -1,4 +1,4 @@
-package com.nebula.karing
+package com.david610.singboxclient
 
 import android.content.Intent
 import android.os.Build

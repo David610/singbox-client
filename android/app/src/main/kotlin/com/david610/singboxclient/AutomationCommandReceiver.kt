@@ -1,4 +1,4 @@
-package com.nebula.karing
+package com.david610.singboxclient
 
 import android.content.BroadcastReceiver
 import android.content.Context
@@ -26,9 +26,9 @@ import app.singboxclient.vpn_core.VpnCoreState
  */
 class AutomationCommandReceiver : BroadcastReceiver() {
     companion object {
-        const val ACTION_CONNECT = "com.nebula.karing.action.CONNECT"
-        const val ACTION_DISCONNECT = "com.nebula.karing.action.DISCONNECT"
-        const val ACTION_RECONNECT = "com.nebula.karing.action.RECONNECT"
+        const val ACTION_CONNECT = "com.david610.singboxclient.action.CONNECT"
+        const val ACTION_DISCONNECT = "com.david610.singboxclient.action.DISCONNECT"
+        const val ACTION_RECONNECT = "com.david610.singboxclient.action.RECONNECT"
     }
 
     override fun onReceive(context: Context, intent: Intent?) {

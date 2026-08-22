@@ -56,9 +56,14 @@ class AutoUpdateCheckVersion {
   String getExtension() {
     String ext = "";
     final channelName = InstallReferrerUtils.getBuildChannelName();
-    if (Platform.isAndroid) {
-      ext = ".apk";
-    } else if (Platform.isWindows) {
+    // Android intentionally never returns an extension here (same "no
+    // download candidate" convention the Linux AppImage case below already
+    // uses): Play Store distribution should update itself through Play,
+    // not an in-app APK download + REQUEST_INSTALL_PACKAGES installer flow
+    // -- see docs/CLIENT_PRODUCTION_BASELINE.md "Self-update removal".
+    // getDownloadPath() above already short-circuits to "" for any empty
+    // extension, so this alone disables the whole download/install path.
+    if (Platform.isWindows) {
       ext = ".exe";
     } else if (Platform.isMacOS) {
       ext = ".dmg";

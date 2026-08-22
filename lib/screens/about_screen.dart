@@ -278,16 +278,12 @@ class AboutScreenState extends LasyRenderingState<AboutScreen> {
           switchOptions: GroupItemSwitchOptions(
             name: tcontext.AboutScreen.disableAppImproveData,
             tips: tcontext.AboutScreen.disableUAReportTip,
-            switchValue:
-                !(RemoteConfigManager.rejectSentrySubmit() ||
-                    SettingManager.getConfig().disableAppImproveData),
-            onSwitch: RemoteConfigManager.rejectSentrySubmit()
-                ? null
-                : (bool value) async {
-                    SettingManager.getConfig().disableAppImproveData = !value;
-                    SettingManager.save();
-                    setState(() {});
-                  },
+            switchValue: !SettingManager.getConfig().disableAppImproveData,
+            onSwitch: (bool value) async {
+              SettingManager.getConfig().disableAppImproveData = !value;
+              SettingManager.save();
+              setState(() {});
+            },
           ),
         ),
       ];

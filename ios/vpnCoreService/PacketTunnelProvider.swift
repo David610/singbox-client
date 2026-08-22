@@ -36,11 +36,11 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
     private var currentConfigJson: String?
 
     /// Shared container both the host app and this extension can read/
-    /// write. Matches the `group.com.nebula.karing` app-group entitlement
+    /// write. Matches the `group.com.david610.singboxclient` app-group entitlement
     /// already present on both `Runner/Runner.entitlements` and
     /// `PacketTunnel.entitlements` -- required because an app extension's
     /// own container is sandboxed separately from the host app's.
-    private static let appGroupID = "group.com.nebula.karing"
+    private static let appGroupID = "group.com.david610.singboxclient"
 
     private func requireGroupContainer() throws -> URL {
         guard let url = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: Self.appGroupID) else {

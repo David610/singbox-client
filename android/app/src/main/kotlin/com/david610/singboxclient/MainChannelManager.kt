@@ -1,4 +1,4 @@
-package com.nebula.karing
+package com.david610.singboxclient
 
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodCall
